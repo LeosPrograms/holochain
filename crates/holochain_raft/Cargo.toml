@@ -1,13 +1,35 @@
-
-
 [package]
 name = "holochain_raft"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+anyhow = "*"
+derive_more = { version = "0.99" }
+futures = "*"
+holo_hash = { path = "../holo_hash" }
+holochain_keystore = { path = "../holochain_keystore" }
+holochain_nonce = { path = "../holochain_nonce" }
+holochain_p2p = { path = "../holochain_p2p" }
+holochain_types = { path = "../holochain_types" }
+once_cell = "*"
+rand = "*"
+rand_distr = "*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+tracing = "*"
+tokio = { version = "*", features = ["sync"] }
 
-[lints]
-workspace = true
+openraft = { git = "https://github.com/maackle/openraft.git", features = [
+  "type-alias",
+] }
+openraft-macros = { git = "https://github.com/maackle/openraft.git" }
+openraft-memstore = { git = "https://github.com/maackle/openraft.git" }
+
+
+[profile.release]
+lto = true
+opt-level = "z"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']

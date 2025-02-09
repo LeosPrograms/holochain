@@ -28,6 +28,8 @@ pub use crate::signal::*;
 pub use crate::validation_receipt::*;
 pub use crate::warrant::*;
 
+pub use crate::ZomeCallParamsSigned;
+
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;
 

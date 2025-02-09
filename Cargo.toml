@@ -18,7 +18,6 @@ members = [
   "crates/holochain_conductor_api",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
-  "crates/holochain_raft",
   "crates/holochain_state",
   "crates/holochain_state_types",
   "crates/holochain_sqlite",
@@ -55,10 +54,9 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-  "crates/holochain_raft",
 ]
 
-exclude = ["crates/release-automation"]
+exclude = ["crates/release-automation", "crates/holochain_raft"]
 
 resolver = "2"
 

@@ -52,6 +52,7 @@ holochain_nonce = { version = "^0.5.0-dev.1", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.5.0-dev.0", path = "../holochain_secure_primitive" }
 holochain_conductor_services = { version = "^0.4.0-dev.17", path = "../holochain_conductor_services" }
 holochain_conductor_config = { version = "^0.5.0-dev.4", path = "../holochain_conductor_config" }
+holochain_raft = { version = "^0.1.0", path = "../holochain_raft", optional = true }
 holochain_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
@@ -345,3 +346,5 @@ unstable-countersigning = [
   "holochain_zome_types/unstable-countersigning",
   "holochain_conductor_api/unstable-countersigning",
 ]
+
+raft = ["holochain_raft"]

@@ -17,6 +17,7 @@ kitsune_p2p_bin_data = { version = "^0.5.0-dev.4", path = "../kitsune_p2p/bin_da
 holo_hash = { version = "^0.5.0-dev.6", path = "../holo_hash", features = [
   "full",
 ] }
+holochain_raft = { version = "^0.1.0", path = "../holochain_raft", optional = true }
 holochain_state_types = { version = "^0.5.0-dev.11", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.5.0-dev.17", path = "../holochain_types" }
@@ -48,6 +49,7 @@ workspace = true
 
 [features]
 chc = []
+raft = ["holochain_raft"]
 unstable-dpki = []
 unstable-sharding = ["kitsune_p2p_types/unstable-sharding"]
 unstable-countersigning = []

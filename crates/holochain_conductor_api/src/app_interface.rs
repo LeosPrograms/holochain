@@ -1,10 +1,13 @@
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
-use holochain_keystore::LairResult;
-use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
 use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
+
+#[cfg(feature = "raft")]
+mod raft;
+#[cfg(feature = "raft")]
+pub use raft::*;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -196,6 +199,9 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     EnableApp,
+
+    /// Raft-related requests
+    Raft(RaftRequest),
     //
     // TODO: implement after DPKI lands
     // /// Replace the agent key associated with this app with a new one.
@@ -271,39 +277,11 @@ pub enum AppResponse {
     /// The app agent key as been rotated, and the new key is returned.
     AppAgentKeyRotated(AgentPubKey),
 
+    /// Raft-related responses
+    Raft(RaftResponse),
+
     /// Operation successful, no payload.
     Ok,
-}
-
-/// The data provided over an app interface in order to make a zome call.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ZomeCallParamsSigned {
-    /// Bytes of the serialized zome call payload that consists of all fields of the
-    /// [`ZomeCallParams`].
-    pub bytes: ExternIO,
-    /// Signature by the provenance of the call, signing the bytes of the zome call payload.
-    pub signature: Signature,
-}
-
-impl ZomeCallParamsSigned {
-    pub fn new(bytes: Vec<u8>, signature: Signature) -> Self {
-        Self {
-            bytes: ExternIO::from(bytes),
-            signature,
-        }
-    }
-
-    pub async fn try_from_params(
-        keystore: &MetaLairClient,
-        params: ZomeCallParams,
-    ) -> LairResult<Self> {
-        let (bytes, bytes_hash) = params.serialize_and_hash().map_err(|e| e.to_string())?;
-        let signature = params
-            .provenance
-            .sign_raw(keystore, bytes_hash.into())
-            .await?;
-        Ok(Self::new(bytes, signature))
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]

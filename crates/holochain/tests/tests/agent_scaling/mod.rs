@@ -190,7 +190,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
 #[cfg(feature = "slow_tests")]
 #[ignore = "performance test meant to be run manually"]
 async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
-    use holochain_conductor_api::{AppRequest, AppResponse, ZomeCallParamsSigned};
+    use holochain_conductor_api::{AppRequest, AppResponse};
     use std::time::Instant;
 
     holochain_trace::test_run();

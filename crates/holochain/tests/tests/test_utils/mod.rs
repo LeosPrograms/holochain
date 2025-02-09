@@ -43,10 +43,7 @@ use tokio::process::Child;
 use tokio::process::Command;
 
 use hdk::prelude::*;
-use holochain::{
-    conductor::api::ZomeCallParamsSigned,
-    conductor::api::{AdminRequest, AdminResponse, AppRequest},
-};
+use holochain::conductor::api::{AdminRequest, AdminResponse, AppRequest};
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;

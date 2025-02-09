@@ -79,7 +79,7 @@ use clap::Parser;
 use ed25519_dalek::Signer;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse, CellInfo,
-    IssueAppAuthenticationTokenPayload, ZomeCallParamsSigned,
+    IssueAppAuthenticationTokenPayload,
 };
 use holochain_types::prelude::{
     AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName,
@@ -88,6 +88,7 @@ use holochain_types::prelude::{
     CAP_SECRET_BYTES,
 };
 use holochain_types::websocket::AllowedOrigins;
+use holochain_types::ZomeCallParamsSigned;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketReceiver};
 use serde::{Deserialize, Serialize};
 use sodoken::BufRead;

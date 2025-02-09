@@ -50,7 +50,12 @@ pub mod inline_zome;
 pub mod test_utils;
 pub mod websocket;
 
+use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 pub use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::{
+    prelude::Signature,
+    zome_io::{ExternIO, ZomeCallParams},
+};
 
 /// Convert to the older deepkey version of an HDK prelude type
 #[macro_export]
@@ -77,3 +82,36 @@ macro_rules! deepkey_roundtrip_forward(
         v
     }}
 );
+
+/// The data provided over an app interface in order to make a zome call.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ZomeCallParamsSigned {
+    /// Bytes of the serialized zome call payload that consists of all fields of the
+    /// [`ZomeCallParams`].
+    pub bytes: ExternIO,
+    /// Signature by the provenance of the call, signing the bytes of the zome call payload.
+    pub signature: Signature,
+}
+
+impl ZomeCallParamsSigned {
+    /// Constructor
+    pub fn new(bytes: Vec<u8>, signature: Signature) -> Self {
+        Self {
+            bytes: ExternIO::from(bytes),
+            signature,
+        }
+    }
+
+    /// Try to construct a [`ZomeCallParamsSigned`] from a [`ZomeCallParams`] and a keystore.
+    pub async fn try_from_params(
+        keystore: &MetaLairClient,
+        params: ZomeCallParams,
+    ) -> LairResult<Self> {
+        let (bytes, bytes_hash) = params.serialize_and_hash().map_err(|e| e.to_string())?;
+        let signature = params
+            .provenance
+            .sign_raw(keystore, bytes_hash.into())
+            .await?;
+        Ok(Self::new(bytes, signature))
+    }
+}

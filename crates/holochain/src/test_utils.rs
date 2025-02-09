@@ -16,7 +16,6 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;

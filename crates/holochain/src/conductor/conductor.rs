@@ -281,6 +281,9 @@ pub struct Conductor {
 
     /// Container to connect app signals to app interfaces, by installed app id.
     app_broadcast: AppBroadcast,
+
+    #[cfg(feature = "raft")]
+    pub(crate) rafts: RwShare<HashMap<EntryHash, holochain_raft::Raft>>,
 }
 
 impl Conductor {
@@ -345,6 +348,9 @@ mod startup_shutdown_impls {
                 wasmer_module_cache: None,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
+
+                #[cfg(feature = "raft")]
+                rafts: RwShare::new(HashMap::new()),
             }
         }
 
@@ -855,7 +861,6 @@ mod network_impls {
     use std::time::Duration;
 
     use futures::future::join_all;
-    use holochain_conductor_api::ZomeCallParamsSigned;
     use rusqlite::params;
 
     use holochain_conductor_api::{
@@ -2793,6 +2798,36 @@ your agent keys if you lose access to your device. This is not recommended!!)
             }
 
             Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "raft")]
+mod raft_impls {
+    use holochain_conductor_api::{RaftRequest, RaftRequestPayload, RaftResponse};
+
+    use super::*;
+
+    impl Conductor {
+        pub(crate) async fn handle_raft_call(
+            &self,
+            raft_call: RaftRequest,
+        ) -> ConductorResult<RaftResponse> {
+            match raft_call.payload {
+                RaftRequestPayload::Join => {
+                    todo!("raft")
+                }
+                RaftRequestPayload::Leave => {
+                    todo!("raft")
+                }
+                RaftRequestPayload::Propose(entry) => {
+                    todo!("raft")
+                }
+                RaftRequestPayload::GetLogEntries(log_id) => {
+                    // let raft = self.rafts.get(raft_call.document);
+                    todo!("raft")
+                }
+            }
         }
     }
 }

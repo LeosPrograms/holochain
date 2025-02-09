@@ -59,7 +59,6 @@ mod check_clone_access;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
-use crate::conductor::api::ZomeCallParamsSigned;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;

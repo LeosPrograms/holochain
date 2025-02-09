@@ -17,7 +17,6 @@ use holochain::{
     fixt::*,
 };
 use holochain_conductor_api::ExternalApiWireError;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::path::PathBuf;
 

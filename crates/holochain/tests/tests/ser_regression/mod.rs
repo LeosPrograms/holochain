@@ -6,7 +6,6 @@ use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::sweettest::*;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
