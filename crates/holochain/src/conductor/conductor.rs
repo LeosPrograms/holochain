@@ -284,7 +284,8 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 
     #[cfg(feature = "raft")]
-    pub(crate) rafts: Mutex<HashMap<EntryHash, holochain_raft::Raft>>,
+    pub(crate) rafts:
+        Mutex<HashMap<EntryHash, (holochain_raft::Raft, Arc<holochain_raft::MemLogStore>)>>,
 }
 
 impl Conductor {
@@ -351,7 +352,7 @@ mod startup_shutdown_impls {
                 app_broadcast: AppBroadcast::default(),
 
                 #[cfg(feature = "raft")]
-                rafts: RwShare::new(HashMap::new()),
+                rafts: Mutex::new(HashMap::new()),
             }
         }
 
@@ -2805,8 +2806,8 @@ your agent keys if you lose access to your device. This is not recommended!!)
 
 #[cfg(feature = "raft")]
 mod raft_impls {
-    use holochain_conductor_api::{RaftRequest, RaftRequestPayload, RaftResponse};
-    use holochain_raft::HcNetworkFactory;
+    use holochain_conductor_api::{RaftRequest, RaftRequestPayload, RaftResponsePayload};
+    use holochain_raft::{HcNetworkFactory, Raft, RaftLogReader, RaftLogStorage};
 
     use super::*;
 
@@ -2814,15 +2815,16 @@ mod raft_impls {
         pub(crate) async fn handle_raft_call(
             &self,
             raft_call: RaftRequest,
-        ) -> ConductorResult<RaftResponse> {
-            let raft = {
+        ) -> ConductorResult<RaftResponsePayload> {
+            let (raft, mut storage) = {
                 let mut rafts = self.rafts.lock();
                 let num = rafts.len();
                 match rafts.entry(raft_call.workspace) {
                     std::collections::hash_map::Entry::Vacant(v) => {
                         let network = HcNetworkFactory {
                             provenance: crate::core::workflow::sys_validation_workflow::get_representative_agent(self, &raft_call.dna_hash).expect("TODO"),
-                            keystore: self.keystore().clone(),
+                            // keystore: self.keystore().clone(),
+                            keystore: todo!(),// self.keystore().clone(),
                             network: self.holochain_p2p().to_dna(raft_call.dna_hash, None),
                         };
                         let raft = holochain_raft::new_raft_mem(num as u64, network)
@@ -2845,8 +2847,12 @@ mod raft_impls {
                     todo!("raft")
                 }
                 RaftRequestPayload::GetLogEntries(log_id) => {
-                    // let raft = self.rafts.get(raft_call.document);
-                    todo!("raft")
+                    let mut reader = storage.get_log_reader().await;
+                    let entries = reader
+                        .try_get_log_entries(log_id.index..)
+                        .await
+                        .map_err(|e| ConductorError::other(e.to_string()))?;
+                    Ok(RaftResponsePayload::LogEntries(entries))
                 }
             }
         }

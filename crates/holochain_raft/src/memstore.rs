@@ -1,10 +1,8 @@
 //! adapted from openraft/stores/memstore/src/lib.rs
 
-#![deny(unused_crate_dependencies)]
 #![deny(unused_qualifications)]
 
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::RangeBounds;

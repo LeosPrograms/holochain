@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::memstore::{new_mem_store, TypeConfig};
+use crate::memstore::{new_mem_store, MemLogStore, TypeConfig};
 use crate::message::{RaftRequest, RaftResponse};
 
 use openraft::{Config, Raft, RaftNetworkFactory};
@@ -11,7 +11,7 @@ pub type NodeId = u64;
 pub async fn new_raft_mem(
     id: NodeId,
     network: impl RaftNetworkFactory<TypeConfig>,
-) -> anyhow::Result<RaftMem> {
+) -> anyhow::Result<(RaftMem, Arc<MemLogStore>)> {
     let config = Arc::new(
         Config {
             heartbeat_interval: 100,
@@ -22,8 +22,8 @@ pub async fn new_raft_mem(
         .validate()?,
     );
     let (storage, state_machine) = new_mem_store();
-    let raft = Raft::new(id, config, network, storage, state_machine).await?;
-    Ok(raft)
+    let raft = Raft::new(id, config, network, storage.clone(), state_machine).await?;
+    Ok((raft, storage))
 }
 
 /// TODO: handle errors

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
@@ -34,7 +36,7 @@ pub static RAFT_DNA_HASH: Lazy<DnaHash> = Lazy::new(|| {
 pub struct HcNetworkFactory {
     pub network: HolochainP2pDna,
     pub provenance: AgentPubKey,
-    pub keystore: MetaLairClient,
+    pub keystore: Arc<MetaLairClient>,
 }
 
 impl HcNetworkFactory {}
@@ -44,7 +46,7 @@ pub struct HcNetwork {
     target_id: NodeId,
     target: HcNode,
     network: HolochainP2pDna,
-    keystore: MetaLairClient,
+    keystore: Arc<MetaLairClient>,
 }
 
 impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {

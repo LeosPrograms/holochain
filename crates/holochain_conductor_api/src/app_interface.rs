@@ -278,7 +278,7 @@ pub enum AppResponse {
     AppAgentKeyRotated(AgentPubKey),
 
     /// Raft-related responses
-    Raft(RaftResponse),
+    Raft(RaftResponsePayload),
 
     /// Operation successful, no payload.
     Ok,
