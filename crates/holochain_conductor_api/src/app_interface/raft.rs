@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RaftRequest {
+    pub dna_hash: DnaHash,
     pub workspace: EntryHash,
     pub payload: RaftRequestPayload,
 }

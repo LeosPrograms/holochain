@@ -22,7 +22,8 @@ pub async fn new_raft_mem(
         .validate()?,
     );
     let (storage, state_machine) = new_mem_store();
-    Ok(Raft::new(id, config, network, storage, state_machine).await?)
+    let raft = Raft::new(id, config, network, storage, state_machine).await?;
+    Ok(raft)
 }
 
 /// TODO: handle errors

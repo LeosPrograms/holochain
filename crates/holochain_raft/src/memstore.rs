@@ -57,37 +57,10 @@ mod leader_id_mode {
     pub use openraft::impls::leader_id_std::LeaderId;
 }
 
-/// The application data request type which the `MemStore` works with.
-///
-/// Conceptually, for demo purposes, this represents an update to a client's status info,
-/// returning the previously recorded status.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ClientRequest {
-    /// The ID of the client which has sent the request.
-    pub client: String,
-
-    /// The serial number of this request.
-    pub serial: u64,
-
-    /// A string describing the status of the client. For a real application, this should probably
-    /// be an enum representing all of the various types of requests / operations which a client
-    /// can perform.
-    pub status: String,
-}
-
-/// Helper trait to build `ClientRequest` for `MemStore` in generic test code.
-pub trait IntoMemClientRequest<T> {
-    fn make_request(client_id: impl ToString, serial: u64) -> T;
-}
-
-impl IntoMemClientRequest<ClientRequest> for ClientRequest {
-    fn make_request(client_id: impl ToString, serial: u64) -> Self {
-        Self {
-            client: client_id.to_string(),
-            serial,
-            status: format!("request-{}", serial),
-        }
-    }
+pub enum ClientRequest {
+    Op(Vec<u8>),
+    Snapshot(Vec<u8>),
 }
 
 /// The application data response type which the `MemStore` works with.
@@ -105,6 +78,9 @@ pub struct MemStoreSnapshot {
     pub data: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Blob(#[serde(with = "serde_bytes")] Vec<u8>);
+
 /// The state machine of the `MemStore`.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct MemStoreStateMachine {
@@ -112,8 +88,9 @@ pub struct MemStoreStateMachine {
 
     pub last_membership: StoredMembership<TypeConfig>,
 
-    /// The current status of a client by ID.
-    pub client_status: HashMap<String, String>,
+    pub last_snap: Option<(LogId<TypeConfig>, Blob)>,
+
+    pub pending_ops: Vec<Blob>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -507,12 +484,16 @@ impl RaftStateMachine<TypeConfig> for Arc<MemStateMachine> {
 
             match entry.payload {
                 EntryPayload::Blank => res.push(ClientResponse(None)),
-                EntryPayload::Normal(ref data) => {
-                    let previous = sm
-                        .client_status
-                        .insert(data.client.clone(), data.status.clone());
-                    res.push(ClientResponse(previous));
-                }
+                EntryPayload::Normal(ref data) => match data {
+                    ClientRequest::Op(ref op) => {
+                        sm.pending_ops.push(Blob(op.clone()));
+                        res.push(ClientResponse(None));
+                    }
+                    ClientRequest::Snapshot(ref snap) => {
+                        sm.last_snap = Some((entry.log_id, Blob(snap.clone())));
+                        res.push(ClientResponse(None));
+                    }
+                },
                 EntryPayload::Membership(ref mem) => {
                     sm.last_membership = StoredMembership::new(Some(entry.log_id), mem.clone());
                     res.push(ClientResponse(None))

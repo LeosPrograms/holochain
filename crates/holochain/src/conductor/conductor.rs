@@ -52,6 +52,7 @@ use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use parking_lot::Mutex;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
@@ -283,7 +284,7 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 
     #[cfg(feature = "raft")]
-    pub(crate) rafts: RwShare<HashMap<EntryHash, holochain_raft::Raft>>,
+    pub(crate) rafts: Mutex<HashMap<EntryHash, holochain_raft::Raft>>,
 }
 
 impl Conductor {
@@ -2805,6 +2806,7 @@ your agent keys if you lose access to your device. This is not recommended!!)
 #[cfg(feature = "raft")]
 mod raft_impls {
     use holochain_conductor_api::{RaftRequest, RaftRequestPayload, RaftResponse};
+    use holochain_raft::HcNetworkFactory;
 
     use super::*;
 
@@ -2813,6 +2815,25 @@ mod raft_impls {
             &self,
             raft_call: RaftRequest,
         ) -> ConductorResult<RaftResponse> {
+            let raft = {
+                let mut rafts = self.rafts.lock();
+                let num = rafts.len();
+                match rafts.entry(raft_call.workspace) {
+                    std::collections::hash_map::Entry::Vacant(v) => {
+                        let network = HcNetworkFactory {
+                            provenance: crate::core::workflow::sys_validation_workflow::get_representative_agent(self, &raft_call.dna_hash).expect("TODO"),
+                            keystore: self.keystore().clone(),
+                            network: self.holochain_p2p().to_dna(raft_call.dna_hash, None),
+                        };
+                        let raft = holochain_raft::new_raft_mem(num as u64, network)
+                            .await
+                            .map_err(|e| ConductorError::other(e.to_string()))?;
+                        v.insert(raft.clone());
+                        raft
+                    }
+                    std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
+                }
+            };
             match raft_call.payload {
                 RaftRequestPayload::Join => {
                     todo!("raft")
