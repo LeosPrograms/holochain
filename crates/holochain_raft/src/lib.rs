@@ -3,10 +3,11 @@ mod message;
 mod network;
 mod raft_mem;
 
-pub use memstore::MemLogStore;
+pub use memstore::{ClientRequest, ClientResponse, MemLogStore, RaftOp, RaftSnap};
 pub use network::HcNetworkFactory;
 pub use raft_mem::{handle_incoming_request, new_raft_mem};
 
+pub use openraft::error;
 pub use openraft::storage::RaftLogStorage;
 pub use openraft::RaftLogReader;
 

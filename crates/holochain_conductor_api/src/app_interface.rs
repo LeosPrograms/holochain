@@ -201,6 +201,7 @@ pub enum AppRequest {
     EnableApp,
 
     /// Raft-related requests
+    #[cfg(feature = "raft")]
     Raft(RaftRequest),
     //
     // TODO: implement after DPKI lands
@@ -278,6 +279,7 @@ pub enum AppResponse {
     AppAgentKeyRotated(AgentPubKey),
 
     /// Raft-related responses
+    #[cfg(feature = "raft")]
     Raft(RaftResponsePayload),
 
     /// Operation successful, no payload.

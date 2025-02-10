@@ -57,8 +57,8 @@ mod leader_id_mode {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ClientRequest {
-    Op(Vec<u8>),
-    Snapshot(Vec<u8>),
+    Op(RaftOp),
+    Snapshot(RaftSnap),
 }
 
 /// The application data response type which the `MemStore` works with.
@@ -77,7 +77,10 @@ pub struct MemStoreSnapshot {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Blob(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct RaftOp(#[serde(with = "serde_bytes")] Vec<u8>);
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct RaftSnap(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// The state machine of the `MemStore`.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -86,9 +89,9 @@ pub struct MemStoreStateMachine {
 
     pub last_membership: StoredMembership<TypeConfig>,
 
-    pub last_snap: Option<(LogId<TypeConfig>, Blob)>,
+    pub last_snap: Option<(LogId<TypeConfig>, RaftSnap)>,
 
-    pub pending_ops: Vec<Blob>,
+    pub pending_ops: Vec<RaftOp>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -482,13 +485,13 @@ impl RaftStateMachine<TypeConfig> for Arc<MemStateMachine> {
 
             match entry.payload {
                 EntryPayload::Blank => res.push(ClientResponse(None)),
-                EntryPayload::Normal(ref data) => match data {
-                    ClientRequest::Op(ref op) => {
-                        sm.pending_ops.push(Blob(op.clone()));
+                EntryPayload::Normal(data) => match data {
+                    ClientRequest::Op(op) => {
+                        sm.pending_ops.push(op);
                         res.push(ClientResponse(None));
                     }
-                    ClientRequest::Snapshot(ref snap) => {
-                        sm.last_snap = Some((entry.log_id, Blob(snap.clone())));
+                    ClientRequest::Snapshot(snap) => {
+                        sm.last_snap = Some((entry.log_id, snap));
                         res.push(ClientResponse(None));
                     }
                 },

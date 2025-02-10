@@ -18,7 +18,7 @@ pub struct RaftResponse {
 pub enum RaftRequestPayload {
     Join,
     Leave,
-    Propose(holochain_raft::Entry),
+    Propose(holochain_raft::RaftOp),
     GetLogEntries(holochain_raft::LogId),
 }
 
