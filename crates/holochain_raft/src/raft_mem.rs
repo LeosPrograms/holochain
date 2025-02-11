@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use crate::memstore::{new_mem_store, MemLogStore, TypeConfig};
-use crate::message::{RaftRequest, RaftResponse};
+use crate::message::{ProposeOpResponse, RaftRequest, RaftResponse};
+use crate::ClientRequest;
 
 use openraft::{Config, Raft, RaftNetworkFactory};
 
@@ -32,6 +33,22 @@ pub async fn handle_incoming_request(raft: &RaftMem, msg: RaftRequest) -> Option
         RaftRequest::AppendEntries(req) => raft.append_entries(req).await.ok()?.into(),
         RaftRequest::InstallSnapshot(req) => raft.install_snapshot(req).await.ok()?.into(),
         RaftRequest::Vote(req) => raft.vote(req).await.ok()?.into(),
+
+        RaftRequest::ProposeOp(op) => match raft.client_write(ClientRequest::Op(op)).await {
+            Err(e) => {
+                if let Some(maybe_leader) = e.forward_to_leader() {
+                    if let Some(leader) = maybe_leader.leader_node.as_ref() {
+                        RaftResponse::ProposeOp(ProposeOpResponse::ForwardToLeader(
+                            leader.agent.clone(),
+                        ));
+                    } else {
+                        RaftResponse::ProposeOp(ProposeOpResponse::NoLeader);
+                    }
+                }
+                return None;
+            }
+            Ok(_) => RaftResponse::ProposeOp(ProposeOpResponse::Accepted),
+        },
     };
     Some(response)
 }

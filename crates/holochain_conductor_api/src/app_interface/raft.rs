@@ -27,4 +27,5 @@ pub enum RaftRequestPayload {
 pub enum RaftResponsePayload {
     LogEntries(Vec<holochain_raft::Entry>),
     Ok,
+    Proposed(holochain_raft::ProposeOpResponse),
 }

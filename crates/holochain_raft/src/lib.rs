@@ -1,9 +1,12 @@
+mod client;
 mod memstore;
 mod message;
 mod network;
 mod raft_mem;
 
-pub use memstore::{ClientRequest, ClientResponse, MemLogStore, RaftOp, RaftSnap};
+pub use client::HcClient;
+pub use memstore::{ClientRequest, ClientResponse, MemLogStore, RaftOp, RaftSnap, TypeConfig};
+pub use message::{ProposeOpResponse, RaftRequest, RaftResponse};
 pub use network::HcNetworkFactory;
 pub use raft_mem::{handle_incoming_request, new_raft_mem};
 

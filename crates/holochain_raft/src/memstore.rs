@@ -65,8 +65,6 @@ pub enum ClientRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClientResponse(pub Option<String>);
 
-pub type MemNodeId = u64;
-
 /// The application snapshot type which the `MemStore` works with.
 #[derive(Debug)]
 pub struct MemStoreSnapshot {
