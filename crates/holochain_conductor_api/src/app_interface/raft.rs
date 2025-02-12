@@ -1,31 +1,40 @@
 use super::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct RaftRequest {
+pub struct RaftInterfaceRequest {
+    /// Hash of the network which contains the peers to sync with, e.g. `syn`
     pub dna_hash: DnaHash,
+    /// A new raft instance is created for each workspace
     pub workspace: EntryHash,
-    pub payload: RaftRequestPayload,
+    /// The actual request
+    pub payload: RaftInterfaceRequestPayload,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct RaftResponse {
+pub struct RaftInterfaceResponse {
+    /// The workspace the request was made for
     pub workspace: EntryHash,
-    pub payload: RaftResponsePayload,
+    /// The actual response
+    pub payload: RaftInterfaceResponsePayload,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum RaftRequestPayload {
-    Join,
+pub enum RaftInterfaceRequestPayload {
+    /// Join the raft network, bootstrapping with the provided peers
+    Join(Vec<AgentPubKey>),
+    /// Leave the raft network
     Leave,
+    /// Propose an operation to the raft network
     Propose(holochain_raft::RaftOp),
+    /// Get log entries starting from the given log id
     GetLogEntries(holochain_raft::LogId),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum RaftResponsePayload {
+pub enum RaftInterfaceResponsePayload {
     LogEntries(Vec<holochain_raft::Entry>),
     Ok,
-    Proposed(holochain_raft::ProposeOpResponse),
+    NoLeader,
 }

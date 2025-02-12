@@ -202,7 +202,7 @@ pub enum AppRequest {
 
     /// Raft-related requests
     #[cfg(feature = "raft")]
-    Raft(RaftRequest),
+    Raft(RaftInterfaceRequest),
     //
     // TODO: implement after DPKI lands
     // /// Replace the agent key associated with this app with a new one.
@@ -280,7 +280,7 @@ pub enum AppResponse {
 
     /// Raft-related responses
     #[cfg(feature = "raft")]
-    Raft(RaftResponsePayload),
+    Raft(RaftInterfaceResponsePayload),
 
     /// Operation successful, no payload.
     Ok,

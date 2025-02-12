@@ -3,7 +3,7 @@ use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
 use once_cell::sync::Lazy;
 
-use crate::message::{ProposeOpResponse, RaftRequest, RaftResponse};
+use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcResponse};
 
 pub static RAFT_DNA_HASH: Lazy<DnaHash> = Lazy::new(|| {
     DnaHash::from_raw_32(vec![
@@ -23,16 +23,16 @@ impl HcClient {
     pub async fn call_leader_with_retry(
         &self,
         mut target: AgentPubKey,
-        message: RaftRequest,
-    ) -> anyhow::Result<RaftResponse> {
+        message: RaftRpcRequest,
+    ) -> anyhow::Result<RaftRpcResponse> {
         let retries = 3;
         for _ in 0..retries {
             let res = self.call(target, message.clone()).await;
             match res {
-                Ok(RaftResponse::ProposeOp(ProposeOpResponse::NoLeader)) => {
+                Ok(RaftRpcResponse::Proposal(ProposalResponse::NoLeader)) => {
                     anyhow::bail!("call_leader_with_retry: No leader found")
                 }
-                Ok(RaftResponse::ProposeOp(ProposeOpResponse::ForwardToLeader(leader))) => {
+                Ok(RaftRpcResponse::Proposal(ProposalResponse::ForwardToLeader(leader))) => {
                     target = leader;
                 }
                 r => return Ok(r?),
@@ -44,8 +44,8 @@ impl HcClient {
     pub async fn call(
         &self,
         target: AgentPubKey,
-        message: RaftRequest,
-    ) -> anyhow::Result<RaftResponse> {
+        message: RaftRpcRequest,
+    ) -> anyhow::Result<RaftRpcResponse> {
         let (nonce, expires_at) =
             holochain_nonce::fresh_nonce(Timestamp::now()).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -70,6 +70,6 @@ impl HcClient {
             .call_remote(target, zome_call_payload.bytes, zome_call_payload.signature)
             .await?;
 
-        Ok(RaftResponse::try_from(out)?)
+        Ok(RaftRpcResponse::try_from(out)?)
     }
 }

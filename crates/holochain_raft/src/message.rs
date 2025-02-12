@@ -4,9 +4,9 @@ use openraft::raft::*;
 use crate::{memstore::TypeConfig, RaftOp};
 
 #[derive(Debug, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum RaftMessage {
-    Request(RaftRequest),
-    Response(RaftResponse),
+pub enum RaftRpc {
+    Request(RaftRpcRequest),
+    Response(RaftRpcResponse),
 }
 
 #[derive(
@@ -18,14 +18,23 @@ pub enum RaftMessage {
     serde::Deserialize,
     SerializedBytes,
 )]
-pub enum RaftRequest {
-    // Raft protocol
+pub enum RaftRpcRequest {
+    // Messages sent *from* the leader
+    #[from]
     AppendEntries(AppendEntriesRequest<TypeConfig>),
+    #[from]
     InstallSnapshot(InstallSnapshotRequest<TypeConfig>),
+    #[from]
     Vote(VoteRequest<TypeConfig>),
 
-    // Client protocol
+    // Messages sent *to* the leader
+    //
+    /// Propose an operation to be added to the log
     ProposeOp(RaftOp),
+    /// An agent wants to join the raft network
+    Join(AgentPubKey),
+    /// An agent wants to leave the raft network
+    Leave(AgentPubKey),
 }
 
 #[derive(
@@ -36,18 +45,18 @@ pub enum RaftRequest {
     serde::Deserialize,
     SerializedBytes,
 )]
-pub enum RaftResponse {
-    // Raft protocol
+pub enum RaftRpcResponse {
+    // Messages sent *from* the leader
     AppendEntries(AppendEntriesResponse<TypeConfig>),
     InstallSnapshot(InstallSnapshotResponse<TypeConfig>),
     Vote(VoteResponse<TypeConfig>),
 
-    // Client protocol
-    ProposeOp(ProposeOpResponse),
+    // Messages sent *to* the leader
+    Proposal(ProposalResponse),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum ProposeOpResponse {
+pub enum ProposalResponse {
     Accepted,
     NoLeader,
     ForwardToLeader(AgentPubKey),
