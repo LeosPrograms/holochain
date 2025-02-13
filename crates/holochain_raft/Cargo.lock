@@ -681,6 +681,9 @@ name = "bytes"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f61dac84819c6588b558454b194026eb1f09c293b9036ae9b159e74e73ab6cf9"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "cc"
@@ -1346,7 +1349,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.5.0-dev.0"
+version = "0.5.0-dev.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -1814,7 +1817,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.5.0-dev.6"
+version = "0.5.0-dev.7"
 dependencies = [
  "base64 0.22.1",
  "blake2b_simd",
@@ -1836,7 +1839,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.2.0-dev.17"
+version = "0.2.0-dev.18"
 dependencies = [
  "async-trait",
  "derive_more 0.99.19",
@@ -1860,7 +1863,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.5.0-dev.11"
+version = "0.5.0-dev.12"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -1877,7 +1880,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.5.0-dev.16"
+version = "0.5.0-dev.17"
 dependencies = [
  "base64 0.22.1",
  "derive_more 0.99.19",
@@ -1905,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.5.0-dev.1"
+version = "0.5.0-dev.2"
 dependencies = [
  "getrandom 0.2.15",
  "holochain_secure_primitive",
@@ -1914,9 +1917,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.5.0-dev.17"
+version = "0.5.0-dev.18"
 dependencies = [
  "async-trait",
+ "bytes",
  "derive_more 0.99.19",
  "fixt",
  "futures",
@@ -1926,15 +1930,15 @@ dependencies = [
  "holochain_keystore",
  "holochain_nonce",
  "holochain_serialized_bytes",
+ "holochain_sqlite",
  "holochain_trace",
  "holochain_types",
  "holochain_zome_types",
+ "kitsune2_api",
  "kitsune_p2p",
  "kitsune_p2p_types",
  "mockall",
- "rand 0.8.5",
  "serde",
- "serde_bytes",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
@@ -1970,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.5.0-dev.0"
+version = "0.5.0-dev.1"
 dependencies = [
  "paste",
  "serde",
@@ -2004,11 +2008,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.5.0-dev.16"
+version = "0.5.0-dev.17"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "bytes",
  "derive_more 0.99.19",
  "fallible-iterator",
  "futures",
@@ -2020,6 +2025,7 @@ dependencies = [
  "holochain_timestamp",
  "holochain_util",
  "holochain_zome_types",
+ "kitsune2_api",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
@@ -2048,7 +2054,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_timestamp"
-version = "0.5.0-dev.0"
+version = "0.5.0-dev.1"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -2073,7 +2079,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.5.0-dev.17"
+version = "0.5.0-dev.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2153,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.5.0-dev.15"
+version = "0.5.0-dev.16"
 dependencies = [
  "derive_builder",
  "derive_more 0.99.19",
@@ -2695,8 +2701,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune2_api"
+version = "0.0.1-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9be45793ae8abe651a61e0f3a489568652a6caa7054d911440d09b51d4dd984e"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "futures",
+ "prost",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "kitsune_p2p"
-version = "0.5.0-dev.10"
+version = "0.5.0-dev.11"
 dependencies = [
  "arrayref",
  "base64 0.22.1",
@@ -2707,6 +2730,7 @@ dependencies = [
  "ghost_actor",
  "governor",
  "holochain_trace",
+ "kitsune2_api",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap_client",
@@ -2734,7 +2758,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "base64 0.22.1",
  "derive_more 0.99.19",
@@ -2747,7 +2771,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -2756,7 +2780,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.4.0-dev.8"
+version = "0.4.0-dev.9"
 dependencies = [
  "clap 4.5.28",
  "futures",
@@ -2774,7 +2798,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.5.0-dev.8"
+version = "0.5.0-dev.9"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_bootstrap",
@@ -2787,7 +2811,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.5.0-dev.2"
+version = "0.5.0-dev.3"
 dependencies = [
  "colored",
  "derivative",
@@ -2823,7 +2847,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.5.0-dev.8"
+version = "0.5.0-dev.9"
 dependencies = [
  "backon",
  "derive_more 0.99.19",
@@ -2862,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.5.0-dev.8"
+version = "0.5.0-dev.9"
 dependencies = [
  "base64 0.22.1",
  "derive_more 0.99.19",
@@ -3919,6 +3943,29 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee1c9ac207483d5e7db4940700de86a9aae46ef90c48b57f99fe7edb8345e49"
 dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
+name = "prost"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
+dependencies = [
+ "bytes",
+ "prost-derive",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
+dependencies = [
+ "anyhow",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
