@@ -49,7 +49,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
     {
         Ok(self
             .client
-            .call(self.target.agent.clone(), rpc.into())
+            .call(self.target.agent(), rpc.into())
             .await
             .unwrap()
             // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?
@@ -67,7 +67,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
     > {
         Ok(self
             .client
-            .call(self.target.agent.clone(), rpc.into())
+            .call(self.target.agent(), rpc.into())
             .await
             .unwrap()
             // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?
@@ -82,7 +82,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
     ) -> Result<VoteResponse<TypeConfig>, RPCError<TypeConfig, RaftError<TypeConfig>>> {
         Ok(self
             .client
-            .call(self.target.agent.clone(), rpc.into())
+            .call(self.target.agent(), rpc.into())
             .await
             .unwrap()
             // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?

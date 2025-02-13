@@ -1,9 +1,12 @@
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
-use once_cell::sync::Lazy;
 
-use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
+use crate::{
+    handle_incoming_request,
+    message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse},
+    raft_mem::RaftMem,
+};
 
 #[derive(Clone)]
 pub struct HcClient {
@@ -16,10 +19,10 @@ pub struct HcClient {
 impl HcClient {
     pub async fn call_leader_with_retry(
         &self,
-        mut target: AgentPubKey,
         message: RaftRpcRequestPayload,
     ) -> anyhow::Result<RaftRpcResponse> {
         let retries = 3;
+        let mut target = self.provenance.clone();
         for _ in 0..retries {
             let res = self.call(target, message.clone()).await;
             match res {
@@ -72,5 +75,12 @@ impl HcClient {
             .await?;
 
         Ok(RaftRpcResponse::try_from(out)?)
+    }
+
+    pub async fn call_self(
+        &self,
+        message: RaftRpcRequestPayload,
+    ) -> anyhow::Result<RaftRpcResponse> {
+        self.call(self.provenance.clone(), message).await
     }
 }

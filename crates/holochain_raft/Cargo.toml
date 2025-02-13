@@ -16,6 +16,7 @@ maplit = "*"
 once_cell = "*"
 rand = "*"
 rand_distr = "*"
+rmp-serde = "*"
 serde = { version = "*", features = ["derive"] }
 serde_bytes = "*"
 serde_json = "*"

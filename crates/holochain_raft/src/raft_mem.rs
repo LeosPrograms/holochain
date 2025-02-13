@@ -1,9 +1,11 @@
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::memstore::{new_mem_store, HcNode, MemLogStore, TypeConfig};
 use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
 use crate::ClientRequest;
 
+use maplit::{btreemap, btreeset};
 use openraft::{ChangeMembers, Config, Raft, RaftNetworkFactory};
 
 pub type RaftMem = Raft<TypeConfig>;
@@ -42,7 +44,7 @@ pub async fn handle_incoming_request(
                     if let Some(maybe_leader) = e.forward_to_leader() {
                         if let Some(leader) = maybe_leader.leader_id.as_ref() {
                             RaftRpcResponse::Proposal(ProposalResponse::ForwardToLeader(
-                                leader.agent.clone(),
+                                leader.agent(),
                             ));
                         } else {
                             RaftRpcResponse::Proposal(ProposalResponse::NoLeader);
@@ -54,16 +56,27 @@ pub async fn handle_incoming_request(
             }
         }
 
+        RaftRpcRequestPayload::Initialize(peers) => {
+            raft.initialize(
+                peers
+                    .into_iter()
+                    .map(|p| HcNode::from(p))
+                    .collect::<BTreeSet<_>>(),
+            )
+            .await?;
+            RaftRpcResponse::Proposal(ProposalResponse::Accepted)
+        }
+
         RaftRpcRequestPayload::Join(agent) => raft
-            .change_membership(vec![agent.into()], false)
+            .change_membership(
+                ChangeMembers::AddVoters(btreemap![agent.into() => ()]),
+                false,
+            )
             .await
             .map(|_| RaftRpcResponse::Proposal(ProposalResponse::Accepted))?,
 
         RaftRpcRequestPayload::Leave(agent) => raft
-            .change_membership(
-                ChangeMembers::RemoveVoters(maplit::btreeset![agent.into()]),
-                false,
-            )
+            .change_membership(ChangeMembers::RemoveVoters(btreeset![agent.into()]), false)
             .await
             .map(|_| RaftRpcResponse::Proposal(ProposalResponse::Accepted))?,
     };

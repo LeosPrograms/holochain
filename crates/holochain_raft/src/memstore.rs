@@ -43,19 +43,27 @@ use tokio::time::Duration;
     Hash,
     Serialize,
     Deserialize,
-    derive_more::From,
     derive_more::Deref,
     derive_more::Display,
 )]
-pub struct HcNode {
-    pub agent: holo_hash::AgentPubKey,
+#[serde(transparent)]
+pub struct HcNode(holo_hash::AgentPubKeyB64);
+
+impl From<holo_hash::AgentPubKey> for HcNode {
+    fn from(agent: holo_hash::AgentPubKey) -> Self {
+        HcNode(agent.into())
+    }
+}
+
+impl HcNode {
+    pub fn agent(&self) -> holo_hash::AgentPubKey {
+        self.0.clone().into()
+    }
 }
 
 impl Default for HcNode {
     fn default() -> Self {
-        HcNode {
-            agent: holo_hash::AgentPubKey::from_raw_32(vec![0; 32]),
-        }
+        HcNode(holo_hash::AgentPubKey::from_raw_32(vec![0; 32]).into())
     }
 }
 
@@ -80,6 +88,7 @@ mod leader_id_mode {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type")]
 pub enum ClientRequest {
     Op(RaftOp),
     Snapshot(RaftSnap),

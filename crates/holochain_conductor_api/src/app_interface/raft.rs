@@ -21,7 +21,9 @@ pub struct RaftInterfaceResponse {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RaftInterfaceRequestPayload {
-    /// Join the raft network, bootstrapping with the provided peers
+    /// Initialize the raft network with the provided peers
+    Initialize(Vec<AgentPubKey>),
+    /// Add the provided peers to the raft network
     Join(Vec<AgentPubKey>),
     /// Leave the raft network
     Leave,

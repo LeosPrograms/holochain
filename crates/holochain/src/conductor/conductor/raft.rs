@@ -48,6 +48,14 @@ impl Conductor {
             .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.workspace)
             .await;
         match raft_call.payload {
+            RaftInterfaceRequestPayload::Initialize(peers) => {
+                client
+                    .call_self(holochain_raft::RaftRpcRequestPayload::Initialize(peers))
+                    .await
+                    .map_err(|e| ConductorError::other(format!("can't initialize: {e:?}")))?;
+
+                Ok(RaftInterfaceResponsePayload::Ok)
+            }
             RaftInterfaceRequestPayload::Join(peers) => {
                 // Ask all known peers to join
                 future::join_all(peers.into_iter().map(move |peer| {
@@ -68,7 +76,7 @@ impl Conductor {
                                 ConductorError::other(format!("Can't connect to leader: {e:?}",)),
                             ),
                             res => Err(ConductorError::other(format!(
-                                "Unexpected response from leader while joining: {res:?}",
+                                "Error from leader while joining: {res:?}",
                             ))),
                         }
                     }
@@ -80,10 +88,9 @@ impl Conductor {
             }
             RaftInterfaceRequestPayload::Leave => {
                 client
-                    .call_leader_with_retry(
+                    .call_leader_with_retry(holochain_raft::RaftRpcRequestPayload::Leave(
                         provenance.clone(),
-                        holochain_raft::RaftRpcRequestPayload::Leave(provenance.clone()),
-                    )
+                    ))
                     .await
                     .map_err(|_| ConductorError::other("can't leave"))?;
                 Ok(RaftInterfaceResponsePayload::Ok)
@@ -91,13 +98,10 @@ impl Conductor {
             RaftInterfaceRequestPayload::Propose(op) => {
                 // XXX: first call is to self. No need to use the client for this.
                 match client
-                    .call_leader_with_retry(
-                        client.provenance.clone(),
-                        holochain_raft::RaftRpcRequestPayload::ProposeOp(op),
-                    )
+                    .call_leader_with_retry(holochain_raft::RaftRpcRequestPayload::ProposeOp(op))
                     .await
                 {
-                    Ok(holochain_raft::RaftRpcResponse::Proposal(res)) => {
+                    Ok(holochain_raft::RaftRpcResponse::Proposal(_res)) => {
                         Ok(RaftInterfaceResponsePayload::Ok)
                     }
                     Ok(res) => Err(ConductorError::other(format!(
@@ -191,7 +195,7 @@ mod tests {
 
         let response = mk_request(
             0,
-            RaftInterfaceRequestPayload::Join(
+            RaftInterfaceRequestPayload::Initialize(
                 cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
             ),
         )

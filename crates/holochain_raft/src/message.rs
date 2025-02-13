@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use holochain_types::prelude::*;
 use openraft::raft::*;
 
@@ -37,6 +39,8 @@ pub enum RaftRpcRequestPayload {
     //
     /// Propose an operation to be added to the log
     ProposeOp(RaftOp),
+    /// Initialize the raft network with the provided peers
+    Initialize(Vec<AgentPubKey>),
     /// An agent wants to join the raft network
     Join(AgentPubKey),
     /// An agent wants to leave the raft network
