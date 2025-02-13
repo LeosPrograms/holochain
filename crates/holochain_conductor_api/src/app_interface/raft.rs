@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RaftInterfaceRequest {
     /// Hash of the network which contains the peers to sync with, e.g. `syn`
     pub dna_hash: DnaHash,
@@ -10,7 +10,7 @@ pub struct RaftInterfaceRequest {
     pub payload: RaftInterfaceRequestPayload,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RaftInterfaceResponse {
     /// The workspace the request was made for
     pub workspace: EntryHash,
@@ -18,7 +18,7 @@ pub struct RaftInterfaceResponse {
     pub payload: RaftInterfaceResponsePayload,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RaftInterfaceRequestPayload {
     /// Join the raft network, bootstrapping with the provided peers
@@ -31,7 +31,7 @@ pub enum RaftInterfaceRequestPayload {
     GetLogEntries(holochain_raft::LogId),
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RaftInterfaceResponsePayload {
     LogEntries(Vec<holochain_raft::Entry>),

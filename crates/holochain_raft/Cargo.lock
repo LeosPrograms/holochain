@@ -1953,6 +1953,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_p2p",
  "holochain_types",
+ "maplit",
  "once_cell",
  "openraft",
  "openraft-macros",

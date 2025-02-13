@@ -12,6 +12,7 @@ holochain_keystore = { path = "../holochain_keystore" }
 holochain_nonce = { path = "../holochain_nonce" }
 holochain_p2p = { path = "../holochain_p2p" }
 holochain_types = { path = "../holochain_types" }
+maplit = "*"
 once_cell = "*"
 rand = "*"
 rand_distr = "*"

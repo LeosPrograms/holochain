@@ -3,83 +3,106 @@ use holochain_conductor_api::{
 };
 use holochain_raft::{
     error::{ClientWriteError, RaftError},
-    HcClient, HcNetworkFactory, RaftLogReader, RaftLogStorage, TypeConfig,
+    HcClient, HcNetworkFactory, MemLogStore, ProposalResponse, Raft, RaftLogReader, RaftLogStorage,
+    RaftRpcRequest, RaftRpcResponse, TypeConfig,
 };
 
 use super::*;
 
 impl Conductor {
-    pub(crate) async fn handle_raft_call(
+    pub(crate) async fn handle_raft_rpc_call(
+        &self,
+        dna_hash: DnaHash,
+        request: RaftRpcRequest,
+    ) -> ConductorResult<RaftRpcResponse> {
+        // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
+        let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
+            self, &dna_hash,
+        )
+        .expect("TODO");
+
+        let (raft, _, _) = self
+            .lookup_raft(dna_hash.clone(), provenance.clone(), request.workspace)
+            .await;
+
+        holochain_raft::handle_incoming_request(&raft, request.payload)
+            .await
+            .map_err(|e| {
+                ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
+            })
+    }
+
+    pub(crate) async fn handle_raft_interface_call(
         &self,
         raft_call: RaftInterfaceRequest,
     ) -> ConductorResult<RaftInterfaceResponsePayload> {
-        let (raft, mut storage, client) = {
-            let mut rafts = self.rafts.lock().await;
-            let num = rafts.len();
-            let dna_hash = raft_call.dna_hash.clone();
+        let dna_hash = raft_call.dna_hash.clone();
 
-            // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
-            let provenance =
-                crate::core::workflow::sys_validation_workflow::get_representative_agent(
-                    self, &dna_hash,
-                )
-                .expect("TODO");
+        // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
+        let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
+            self, &dna_hash,
+        )
+        .expect("TODO");
 
-            match rafts.entry(raft_call.workspace) {
-                std::collections::hash_map::Entry::Vacant(v) => {
-                    let client = HcClient {
-                        provenance,
-                        keystore: self.keystore().clone(),
-                        network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    };
-                    let network = HcNetworkFactory {
-                        client: client.clone(),
-                    };
-                    let (raft, storage) = holochain_raft::new_raft_mem(num as u64, network)
-                        .await
-                        .map_err(|e| ConductorError::other(e.to_string()))?;
-                    let tup = (raft, storage, client);
-                    v.insert(tup.clone());
-                    tup
-                }
-                std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
-            }
-        };
+        let (_, mut storage, client) = self
+            .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.workspace)
+            .await;
         match raft_call.payload {
             RaftInterfaceRequestPayload::Join(peers) => {
-                future::join_all(peers.into_iter().map(|peer| async move {
-                    let res = client
-                        .call(peer, holochain_raft::RaftRpcRequest::Join)
-                        .await;
-                    match res {
-                        Ok(holochain_raft::RaftRpcResponse::Proposal(
-                            holochain_raft::ProposalResponse::Accepted,
-                        )) => Ok(RaftInterfaceResponsePayload::Ok),
-                        Ok(holochain_raft::RaftRpcResponse::Proposal(_)) => {
-                            Err(ConductorError::other("Can't connect to leader"))
+                // Ask all known peers to join
+                future::join_all(peers.into_iter().map(move |peer| {
+                    let client = client.clone();
+                    let provenance = provenance.clone();
+                    async move {
+                        let res = client
+                            .call(
+                                peer.clone(),
+                                holochain_raft::RaftRpcRequestPayload::Join(provenance.clone()),
+                            )
+                            .await;
+                        match res {
+                            Ok(holochain_raft::RaftRpcResponse::Proposal(
+                                holochain_raft::ProposalResponse::Accepted,
+                            )) => Ok(()),
+                            Ok(holochain_raft::RaftRpcResponse::Proposal(e)) => Err(
+                                ConductorError::other(format!("Can't connect to leader: {e:?}",)),
+                            ),
+                            res => Err(ConductorError::other(format!(
+                                "Unexpected response from leader while joining: {res:?}",
+                            ))),
                         }
-                        _ => Err(ConductorError::other("Unexpected response from leader")),
                     }
                 }))
                 .await
-                .collect::<Result<Vec<_>, _>>()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
+                Ok(RaftInterfaceResponsePayload::Ok)
             }
             RaftInterfaceRequestPayload::Leave => {
-                todo!("raft")
+                client
+                    .call_leader_with_retry(
+                        provenance.clone(),
+                        holochain_raft::RaftRpcRequestPayload::Leave(provenance.clone()),
+                    )
+                    .await
+                    .map_err(|_| ConductorError::other("can't leave"))?;
+                Ok(RaftInterfaceResponsePayload::Ok)
             }
             RaftInterfaceRequestPayload::Propose(op) => {
                 // XXX: first call is to self. No need to use the client for this.
                 match client
                     .call_leader_with_retry(
                         client.provenance.clone(),
-                        holochain_raft::RaftRpcRequest::ProposeOp(op),
+                        holochain_raft::RaftRpcRequestPayload::ProposeOp(op),
                     )
                     .await
                 {
                     Ok(holochain_raft::RaftRpcResponse::Proposal(res)) => {
                         Ok(RaftInterfaceResponsePayload::Ok)
                     }
-                    Ok(_) => Err(ConductorError::other("Unexpected response from leader")),
+                    Ok(res) => Err(ConductorError::other(format!(
+                        "Unexpected response from leader during proposal: {res:?}",
+                    ))),
                     Err(e) => Err(ConductorError::other(e.to_string())),
                 }
             }
@@ -91,6 +114,38 @@ impl Conductor {
                     .map_err(|e| ConductorError::other(e.to_string()))?;
                 Ok(RaftInterfaceResponsePayload::LogEntries(entries))
             }
+        }
+    }
+
+    async fn lookup_raft(
+        &self,
+        dna_hash: DnaHash,
+        provenance: AgentPubKey,
+        workspace: EntryHash,
+    ) -> (Raft, Arc<MemLogStore>, HcClient) {
+        let mut rafts = self.rafts.lock().await;
+
+        match rafts.entry((dna_hash.clone(), workspace.clone())) {
+            std::collections::hash_map::Entry::Vacant(v) => {
+                let client = HcClient {
+                    provenance: provenance.clone(),
+                    keystore: self.keystore().clone(),
+                    workspace: workspace.clone(),
+                    network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
+                };
+                let network = HcNetworkFactory {
+                    client: client.clone(),
+                };
+                let (raft, storage) =
+                    holochain_raft::new_raft_mem(provenance.clone().into(), network)
+                        .await
+                        .map_err(|e| ConductorError::other(e.to_string()))
+                        .expect("TODO");
+                let tup = (raft, storage, client);
+                v.insert(tup.clone());
+                tup
+            }
+            std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
         }
     }
 }
@@ -105,3 +160,44 @@ pub enum HcRaftError<RE> {
 }
 
 pub type HcRaftResult<T, RE> = Result<T, HcRaftError<RE>>;
+
+#[cfg(test)]
+mod tests {
+    use holochain_wasm_test_utils::TestWasm;
+
+    use super::*;
+    use crate::sweettest::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_raft() {
+        let workspace = EntryHash::from_raw_32(vec![55; 32]);
+        let config = SweetConductorConfig::standard();
+        let mut conductors = SweetConductorBatch::from_config(5, config).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
+        let dna_hash = dna_file.dna_hash().clone();
+
+        let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+        let cells = apps.cells_flattened();
+        conductors.exchange_peer_info().await;
+
+        let mk_request = |i: usize, payload: RaftInterfaceRequestPayload| {
+            conductors[i].handle_raft_interface_call(RaftInterfaceRequest {
+                dna_hash: dna_hash.clone(),
+                workspace: workspace.clone(),
+                payload,
+            })
+        };
+
+        let response = mk_request(
+            0,
+            RaftInterfaceRequestPayload::Join(
+                cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
+            ),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(response, RaftInterfaceResponsePayload::Ok);
+    }
+}

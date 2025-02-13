@@ -16,8 +16,6 @@ use crate::{
     memstore::{HcNode, TypeConfig},
 };
 
-pub type NodeId = u64;
-
 #[derive(Clone)]
 pub struct HcNetworkFactory {
     pub client: HcClient,
@@ -33,9 +31,9 @@ pub struct HcNetwork {
 impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {
     type Network = HcNetwork;
 
-    async fn new_client(&mut self, _target_id: NodeId, node: &HcNode) -> Self::Network {
+    async fn new_client(&mut self, target: HcNode, _: &()) -> Self::Network {
         HcNetwork {
-            target: node.clone(),
+            target,
             client: self.client.clone(),
         }
     }

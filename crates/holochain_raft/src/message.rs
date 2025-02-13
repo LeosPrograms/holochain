@@ -9,6 +9,12 @@ pub enum RaftRpc {
     Response(RaftRpcResponse),
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct RaftRpcRequest {
+    pub workspace: EntryHash,
+    pub payload: RaftRpcRequestPayload,
+}
+
 #[derive(
     Debug,
     Clone,
@@ -18,7 +24,7 @@ pub enum RaftRpc {
     serde::Deserialize,
     SerializedBytes,
 )]
-pub enum RaftRpcRequest {
+pub enum RaftRpcRequestPayload {
     // Messages sent *from* the leader
     #[from]
     AppendEntries(AppendEntriesRequest<TypeConfig>),

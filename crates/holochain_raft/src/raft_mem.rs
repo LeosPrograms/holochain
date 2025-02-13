@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
-use crate::memstore::{new_mem_store, MemLogStore, TypeConfig};
-use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcResponse};
+use crate::memstore::{new_mem_store, HcNode, MemLogStore, TypeConfig};
+use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
 use crate::ClientRequest;
 
-use openraft::{Config, Raft, RaftNetworkFactory};
+use openraft::{ChangeMembers, Config, Raft, RaftNetworkFactory};
 
 pub type RaftMem = Raft<TypeConfig>;
-pub type NodeId = u64;
 
 pub async fn new_raft_mem(
-    id: NodeId,
+    id: HcNode,
     network: impl RaftNetworkFactory<TypeConfig>,
 ) -> anyhow::Result<(RaftMem, Arc<MemLogStore>)> {
     let config = Arc::new(
@@ -30,34 +29,43 @@ pub async fn new_raft_mem(
 /// TODO: handle errors
 pub async fn handle_incoming_request(
     raft: &RaftMem,
-    msg: RaftRpcRequest,
-) -> Option<RaftRpcResponse> {
+    msg: RaftRpcRequestPayload,
+) -> anyhow::Result<RaftRpcResponse> {
     let response = match msg {
-        RaftRpcRequest::AppendEntries(req) => raft.append_entries(req).await.ok()?.into(),
-        RaftRpcRequest::InstallSnapshot(req) => raft.install_snapshot(req).await.ok()?.into(),
-        RaftRpcRequest::Vote(req) => raft.vote(req).await.ok()?.into(),
+        RaftRpcRequestPayload::AppendEntries(req) => raft.append_entries(req).await?.into(),
+        RaftRpcRequestPayload::InstallSnapshot(req) => raft.install_snapshot(req).await?.into(),
+        RaftRpcRequestPayload::Vote(req) => raft.vote(req).await?.into(),
 
-        RaftRpcRequest::ProposeOp(op) => match raft.client_write(ClientRequest::Op(op)).await {
-            Err(e) => {
-                if let Some(maybe_leader) = e.forward_to_leader() {
-                    if let Some(leader) = maybe_leader.leader_node.as_ref() {
-                        RaftRpcResponse::Proposal(ProposalResponse::ForwardToLeader(
-                            leader.agent.clone(),
-                        ));
-                    } else {
-                        RaftRpcResponse::Proposal(ProposalResponse::NoLeader);
+        RaftRpcRequestPayload::ProposeOp(op) => {
+            match raft.client_write(ClientRequest::Op(op)).await {
+                Err(e) => {
+                    if let Some(maybe_leader) = e.forward_to_leader() {
+                        if let Some(leader) = maybe_leader.leader_id.as_ref() {
+                            RaftRpcResponse::Proposal(ProposalResponse::ForwardToLeader(
+                                leader.agent.clone(),
+                            ));
+                        } else {
+                            RaftRpcResponse::Proposal(ProposalResponse::NoLeader);
+                        }
                     }
+                    anyhow::bail!("no leader");
                 }
-                return None;
+                Ok(_) => RaftRpcResponse::Proposal(ProposalResponse::Accepted),
             }
-            Ok(_) => RaftRpcResponse::Proposal(ProposalResponse::Accepted),
-        },
-        RaftRpcRequest::Join(agent) => raft
-            .change_membership(vec![agent], false)
+        }
+
+        RaftRpcRequestPayload::Join(agent) => raft
+            .change_membership(vec![agent.into()], false)
             .await
-            .ok()?
-            .into(),
-        RaftRpcRequest::Leave => todo!(),
+            .map(|_| RaftRpcResponse::Proposal(ProposalResponse::Accepted))?,
+
+        RaftRpcRequestPayload::Leave(agent) => raft
+            .change_membership(
+                ChangeMembers::RemoveVoters(maplit::btreeset![agent.into()]),
+                false,
+            )
+            .await
+            .map(|_| RaftRpcResponse::Proposal(ProposalResponse::Accepted))?,
     };
-    Some(response)
+    Ok(response)
 }

@@ -199,7 +199,10 @@ impl AppInterfaceApi {
             }
             #[cfg(feature = "raft")]
             AppRequest::Raft(raft_call) => {
-                let raft_response = self.conductor_handle.handle_raft_call(raft_call).await?;
+                let raft_response = self
+                    .conductor_handle
+                    .handle_raft_interface_call(raft_call)
+                    .await?;
                 Ok(AppResponse::Raft(raft_response))
             } //
               // TODO: implement after DPKI lands

@@ -288,7 +288,7 @@ pub struct Conductor {
     #[cfg(feature = "raft")]
     pub(crate) rafts: tokio::sync::Mutex<
         HashMap<
-            EntryHash,
+            (DnaHash, EntryHash),
             (
                 holochain_raft::Raft,
                 Arc<holochain_raft::MemLogStore>,

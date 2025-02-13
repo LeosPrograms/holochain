@@ -347,4 +347,4 @@ unstable-countersigning = [
   "holochain_conductor_api/unstable-countersigning",
 ]
 
-raft = ["holochain_raft"]
+raft = ["holochain_raft", "holochain_conductor_api/raft"]

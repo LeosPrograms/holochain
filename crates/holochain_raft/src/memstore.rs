@@ -33,9 +33,30 @@ use serde::Serialize;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    derive_more::From,
+    derive_more::Deref,
+    derive_more::Display,
+)]
 pub struct HcNode {
     pub agent: holo_hash::AgentPubKey,
+}
+
+impl Default for HcNode {
+    fn default() -> Self {
+        HcNode {
+            agent: holo_hash::AgentPubKey::from_raw_32(vec![0; 32]),
+        }
+    }
 }
 
 openraft::declare_raft_types!(
@@ -43,9 +64,12 @@ openraft::declare_raft_types!(
     pub TypeConfig:
         D = ClientRequest,
         R = ClientResponse,
-        Node = HcNode,
+        NodeId = HcNode,
+        Node = (),
         LeaderId = leader_id_mode::LeaderId<TypeConfig>,
 );
+
+impl openraft::NodeId for HcNode {}
 
 /// Choose a LeaderId implementation by feature flag.
 mod leader_id_mode {
@@ -55,14 +79,14 @@ mod leader_id_mode {
     pub use openraft::impls::leader_id_std::LeaderId;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ClientRequest {
     Op(RaftOp),
     Snapshot(RaftSnap),
 }
 
 /// The application data response type which the `MemStore` works with.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ClientResponse(pub Option<String>);
 
 /// The application snapshot type which the `MemStore` works with.
@@ -74,10 +98,10 @@ pub struct MemStoreSnapshot {
     pub data: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct RaftOp(#[serde(with = "serde_bytes")] Vec<u8>);
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct RaftSnap(#[serde(with = "serde_bytes")] Vec<u8>);
 
 /// The state machine of the `MemStore`.
@@ -234,7 +258,7 @@ impl RaftLogReader<TypeConfig> for Arc<MemLogStore> {
     }
 
     async fn read_vote(&mut self) -> Result<Option<Vote<TypeConfig>>, StorageError<TypeConfig>> {
-        Ok(*self.vote.read().await)
+        Ok(self.vote.read().await.clone())
     }
 }
 
@@ -349,7 +373,7 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
         tracing::debug!(?vote, "save_vote");
         let mut h = self.vote.write().await;
 
-        *h = Some(*vote);
+        *h = Some(vote.clone());
         Ok(())
     }
 
