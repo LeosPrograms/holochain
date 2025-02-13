@@ -108,10 +108,10 @@ pub struct MemStoreSnapshot {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
-pub struct RaftOp(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct RaftOp(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
-pub struct RaftSnap(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct RaftSnap(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// The state machine of the `MemStore`.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

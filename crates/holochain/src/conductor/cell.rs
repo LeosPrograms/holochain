@@ -871,20 +871,6 @@ impl Cell {
             ));
         }
 
-        if zome_call_params.fn_name == FunctionName::from("raft-hardwired-hack")
-            && zome_call_params.zome_name == ZomeName::from("raft-hardwired-hack")
-        {
-            self.conductor_handle
-                .handle_raft_rpc_call(
-                    self.id().dna_hash().clone(),
-                    zome_call_params.payload.decode()?,
-                )
-                .await
-                .map_err(|e| {
-                    CellError::ConductorApiError(Box::new(ConductorApiError::other(e.to_string())))
-                })?;
-        }
-
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
@@ -902,6 +888,18 @@ impl Cell {
         params: ZomeCallParams,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
+        if params.fn_name == FunctionName::from("raft-hardwired-hack")
+            || params.zome_name == ZomeName::from("raft-hardwired-hack")
+        {
+            self.conductor_handle
+                .handle_raft_rpc_call(self.id().dna_hash().clone(), params.payload.decode()?)
+                .await
+                .map_err(|e| {
+                    CellError::ConductorApiError(Box::new(ConductorApiError::other(e.to_string())))
+                })?;
+            return Ok(Ok(ZomeCallResponse::Ok(ExternIO(vec![]))));
+        }
+
         // Only check if init has run if this call is not coming from
         // an already running init call.
         if workspace_lock

@@ -43,26 +43,7 @@ impl HcClient {
         target: AgentPubKey,
         message: RaftRpcRequestPayload,
     ) -> anyhow::Result<RaftRpcResponse> {
-        let (nonce, expires_at) =
-            holochain_nonce::fresh_nonce(Timestamp::now()).map_err(|e| anyhow::anyhow!(e))?;
-
-        let dna_hash = self.network.dna_hash();
-        let cell_id = CellId::new(dna_hash, target.clone());
-
-        let payload = ExternIO::encode(RaftRpcRequest {
-            workspace: self.workspace.clone(),
-            payload: message,
-        })?;
-        let zome_call_params = ZomeCallParams {
-            provenance: self.provenance.clone(),
-            cell_id,
-            zome_name: "raft-hardwired-hack".into(),
-            fn_name: "raft-hardwired-hack".into(),
-            cap_secret: None,
-            payload,
-            nonce,
-            expires_at,
-        };
+        let zome_call_params = self.zome_call_params(target.clone(), message)?;
         let zome_call_payload = holochain_types::ZomeCallParamsSigned::try_from_params(
             &self.keystore,
             zome_call_params.clone(),
@@ -74,13 +55,42 @@ impl HcClient {
             .call_remote(target, zome_call_payload.bytes, zome_call_payload.signature)
             .await?;
 
-        Ok(RaftRpcResponse::try_from(out)?)
+        let zcr = ZomeCallResponse::try_from(out)?;
+        dbg!("here we go");
+        match zcr {
+            ZomeCallResponse::Ok(out) => {
+                dbg!("this is probably the problem");
+                Ok(out.decode()?)
+            }
+            // ZomeCallResponse::Ok(out) => Ok(RaftRpcResponse::try_from(out)?),
+            _ => anyhow::bail!("call: unexpected response: {:?}", zcr),
+        }
     }
 
-    pub async fn call_self(
+    pub fn zome_call_params(
         &self,
+        target: AgentPubKey,
         message: RaftRpcRequestPayload,
-    ) -> anyhow::Result<RaftRpcResponse> {
-        self.call(self.provenance.clone(), message).await
+    ) -> anyhow::Result<ZomeCallParams> {
+        let (nonce, expires_at) =
+            holochain_nonce::fresh_nonce(Timestamp::now()).map_err(|e| anyhow::anyhow!(e))?;
+
+        let dna_hash = self.network.dna_hash();
+        let cell_id = CellId::new(dna_hash, target.clone());
+
+        let payload = ExternIO::encode(RaftRpcRequest {
+            workspace: self.workspace.clone(),
+            payload: message,
+        })?;
+        Ok(ZomeCallParams {
+            provenance: self.provenance.clone(),
+            cell_id,
+            zome_name: "raft-hardwired-hack".into(),
+            fn_name: "raft-hardwired-hack".into(),
+            cap_secret: None,
+            payload,
+            nonce,
+            expires_at,
+        })
     }
 }

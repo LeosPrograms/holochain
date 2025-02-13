@@ -49,10 +49,18 @@ impl Conductor {
             .await;
         match raft_call.payload {
             RaftInterfaceRequestPayload::Initialize(peers) => {
-                client
-                    .call_self(holochain_raft::RaftRpcRequestPayload::Initialize(peers))
+                let zome_call_params = client
+                    .zome_call_params(
+                        provenance.clone(),
+                        holochain_raft::RaftRpcRequestPayload::Initialize(peers),
+                    )
+                    .map_err(|e| {
+                        ConductorError::other(format!("couldn't format zome call params: {e:?}"))
+                    })?;
+
+                self.call_zome(zome_call_params)
                     .await
-                    .map_err(|e| ConductorError::other(format!("can't initialize: {e:?}")))?;
+                    .map_err(|e| ConductorError::other(format!("can't initialize: {e:?}")))??;
 
                 Ok(RaftInterfaceResponsePayload::Ok)
             }
@@ -167,6 +175,7 @@ pub type HcRaftResult<T, RE> = Result<T, HcRaftError<RE>>;
 
 #[cfg(test)]
 mod tests {
+    use holochain_raft::RaftOp;
     use holochain_wasm_test_utils::TestWasm;
 
     use super::*;
@@ -174,9 +183,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_raft() {
+        let num = 5;
         let workspace = EntryHash::from_raw_32(vec![55; 32]);
         let config = SweetConductorConfig::standard();
-        let mut conductors = SweetConductorBatch::from_config(5, config).await;
+        let mut conductors = SweetConductorBatch::from_config(num, config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
         let dna_hash = dna_file.dna_hash().clone();
@@ -193,15 +203,31 @@ mod tests {
             })
         };
 
-        let response = mk_request(
-            0,
-            RaftInterfaceRequestPayload::Initialize(
-                cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
-            ),
-        )
-        .await
-        .unwrap();
+        for i in 0..num {
+            let response = mk_request(
+                i,
+                RaftInterfaceRequestPayload::Initialize(
+                    cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
+                ),
+            )
+            .await
+            .unwrap();
 
-        assert_eq!(response, RaftInterfaceResponsePayload::Ok);
+            assert_eq!(response, RaftInterfaceResponsePayload::Ok);
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+        mk_request(0, RaftInterfaceRequestPayload::Propose(RaftOp(vec![0])))
+            .await
+            .unwrap();
+
+        mk_request(1, RaftInterfaceRequestPayload::Propose(RaftOp(vec![1])))
+            .await
+            .unwrap();
+
+        mk_request(2, RaftInterfaceRequestPayload::Propose(RaftOp(vec![2])))
+            .await
+            .unwrap();
     }
 }

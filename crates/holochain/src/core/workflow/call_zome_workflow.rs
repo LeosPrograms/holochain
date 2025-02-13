@@ -53,6 +53,12 @@ pub async fn call_zome_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    if args.invocation.fn_name == FunctionName::from("raft-hardwired-hack")
+        || *args.invocation.zome.zome_name() == ZomeName::from("raft-hardwired-hack")
+    {
+        unimplemented!("must handle raft hack here too");
+    }
+
     let coordinator_zome = args
         .ribosome
         .dna_def()
