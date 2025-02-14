@@ -2,9 +2,8 @@ use holochain_conductor_api::{
     RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
 };
 use holochain_raft::{
-    error::{ClientWriteError, RaftError},
-    HcClient, HcNetworkFactory, MemLogStore, ProposalResponse, Raft, RaftLogReader, RaftLogStorage,
-    RaftRpcRequest, RaftRpcResponse, TypeConfig,
+    HcClient, HcNetworkFactory, MemLogStore, Raft, RaftLogReader, RaftLogStorage, RaftRpcRequest,
+    RaftRpcResponse,
 };
 
 use super::*;
@@ -171,8 +170,6 @@ pub enum HcRaftError<RE> {
     RaftError(#[from] RE),
 }
 
-pub type HcRaftResult<T, RE> = Result<T, HcRaftError<RE>>;
-
 #[cfg(test)]
 mod tests {
     use holochain_raft::RaftOp;
@@ -204,16 +201,14 @@ mod tests {
         };
 
         for i in 0..num {
-            let response = mk_request(
+            // This may error if a raft message was already sent from another initialized node.
+            let _ = mk_request(
                 i,
                 RaftInterfaceRequestPayload::Initialize(
                     cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
                 ),
             )
-            .await
-            .unwrap();
-
-            assert_eq!(response, RaftInterfaceResponsePayload::Ok);
+            .await;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;

@@ -88,7 +88,6 @@ mod leader_id_mode {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(tag = "type")]
 pub enum ClientRequest {
     Op(RaftOp),
     Snapshot(RaftSnap),
@@ -257,10 +256,14 @@ impl RaftLogReader<TypeConfig> for Arc<MemLogStore> {
         {
             let log = self.log.read().await;
             for (_, serialized) in log.range(range.clone()) {
-                dbg!("serialized 2:", serialized);
-
-                let ent =
-                    serde_json::from_str(serialized).map_err(|e| StorageError::read_logs(&e))?;
+                let ent: Entry<TypeConfig> = match serde_json::from_str(serialized) {
+                    Ok(ent) => ent,
+                    Err(err) => {
+                        dbg!(serialized, &err);
+                        return Err(StorageError::read_logs(&err));
+                    }
+                };
+                // dbg!("ok");
                 entries.push(ent);
             }
         };
@@ -356,7 +359,7 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
         let last = match last_serialized {
             None => None,
             Some(serialized) => {
-                dbg!("serialized 1:", serialized);
+                // dbg!("serialized 1:", serialized);
                 let ent: Entry<TypeConfig> =
                     serde_json::from_str(serialized).map_err(|e| StorageError::read_logs(&e))?;
                 Some(ent.log_id())

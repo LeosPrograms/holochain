@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "*"
 derive_more = { version = "0.99" }
 futures = "*"
-holo_hash = { path = "../holo_hash" }
+holo_hash = { path = "../holo_hash", features = ["full"] }
 holochain_keystore = { path = "../holochain_keystore" }
 holochain_nonce = { path = "../holochain_nonce" }
 holochain_p2p = { path = "../holochain_p2p" }

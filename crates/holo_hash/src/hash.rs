@@ -78,6 +78,7 @@ impl<T: HashType> HoloHash<T> {
     /// bytes to determine the hash_type
     pub fn try_from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
         if hash.len() != HOLO_HASH_FULL_LEN {
+            dbg!(hash.len(), &hash);
             return Err(HoloHashError::BadSize);
         }
         let hash_type = T::try_from_prefix(&hash[0..3])?;
@@ -95,6 +96,7 @@ impl<T: HashType> HoloHash<T> {
     /// along with a type, to construct a hash.
     pub fn try_from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> HoloHashResult<Self> {
         if bytes.len() != HOLO_HASH_UNTYPED_LEN {
+            dbg!(&bytes);
             return Err(HoloHashError::BadSize);
         }
         let mut hash = hash_type.get_prefix().to_vec();

@@ -55,6 +55,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
         _option: RPCOption,
     ) -> Result<AppendEntriesResponse<TypeConfig>, RPCError<TypeConfig, RaftError<TypeConfig>>>
     {
+        // println!("<RAFT> append_entries {rpc:?}");
         Ok(self
             .client
             .call(self.target.agent(), rpc.into())
@@ -78,6 +79,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
         InstallSnapshotResponse<TypeConfig>,
         RPCError<TypeConfig, RaftError<TypeConfig, InstallSnapshotError>>,
     > {
+        // println!("<RAFT> install_snapshot {rpc:?}");
         Ok(self
             .client
             .call(self.target.agent(), rpc.into())
@@ -98,6 +100,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
         rpc: VoteRequest<TypeConfig>,
         _option: RPCOption,
     ) -> Result<VoteResponse<TypeConfig>, RPCError<TypeConfig, RaftError<TypeConfig>>> {
+        // println!("<RAFT> vote {rpc:?}");
         Ok(self
             .client
             .call(self.target.agent(), rpc.into())
