@@ -891,13 +891,14 @@ impl Cell {
         if params.fn_name == FunctionName::from("raft-hardwired-hack")
             || params.zome_name == ZomeName::from("raft-hardwired-hack")
         {
-            self.conductor_handle
+            let res = self
+                .conductor_handle
                 .handle_raft_rpc_call(self.id().dna_hash().clone(), params.payload.decode()?)
                 .await
                 .map_err(|e| {
                     CellError::ConductorApiError(Box::new(ConductorApiError::other(e.to_string())))
                 })?;
-            return Ok(Ok(ZomeCallResponse::Ok(ExternIO(vec![]))));
+            return Ok(Ok(ZomeCallResponse::Ok(ExternIO::encode(res)?)));
         }
 
         // Only check if init has run if this call is not coming from

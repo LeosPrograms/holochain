@@ -1,7 +1,7 @@
 use holochain_types::prelude::*;
 // use log_store::LogStore;
 use openraft::{
-    error::InstallSnapshotError,
+    error::{Fatal, InstallSnapshotError, RemoteError},
     raft::{InstallSnapshotRequest, InstallSnapshotResponse},
 };
 use openraft::{
@@ -39,6 +39,14 @@ impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {
     }
 }
 
+#[derive(
+    holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::thiserror::Error,
+    Debug,
+    derive_more::Display,
+    derive_more::From,
+)]
+pub struct RemoteErrorWrapper(anyhow::Error);
+
 impl RaftNetwork<TypeConfig> for HcNetwork {
     /// Send an AppendEntries RPC to the target.
     async fn append_entries(
@@ -51,8 +59,13 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
             .client
             .call(self.target.agent(), rpc.into())
             .await
-            .unwrap()
-            // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?
+            .map_err(|e| {
+                tracing::error!("Error calling append entries: {:?}", e);
+                RPCError::RemoteError(RemoteError::new(
+                    self.target.clone(),
+                    RaftError::Fatal(Fatal::Panicked),
+                ))
+            })?
             .unwrap_append_entries())
     }
 
@@ -69,8 +82,13 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
             .client
             .call(self.target.agent(), rpc.into())
             .await
-            .unwrap()
-            // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?
+            .map_err(|e| {
+                tracing::error!("Error calling install snapshot: {:?}", e);
+                RPCError::RemoteError(RemoteError::new(
+                    self.target.clone(),
+                    RaftError::Fatal(Fatal::Panicked),
+                ))
+            })?
             .unwrap_install_snapshot())
     }
 
@@ -84,8 +102,14 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
             .client
             .call(self.target.agent(), rpc.into())
             .await
-            .unwrap()
-            // .map_err(|e| RPCError::RemoteError(RemoteError::new(self.target_id, e)))?
+            // .unwrap()
+            .map_err(|e| {
+                tracing::error!("Error calling vote: {:?}", e);
+                RPCError::RemoteError(RemoteError::new(
+                    self.target.clone(),
+                    RaftError::Fatal(Fatal::Panicked),
+                ))
+            })?
             .unwrap_vote())
     }
 }

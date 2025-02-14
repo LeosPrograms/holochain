@@ -56,12 +56,8 @@ impl HcClient {
             .await?;
 
         let zcr = ZomeCallResponse::try_from(out)?;
-        dbg!("here we go");
         match zcr {
-            ZomeCallResponse::Ok(out) => {
-                dbg!("this is probably the problem");
-                Ok(out.decode()?)
-            }
+            ZomeCallResponse::Ok(out) => Ok(out.decode()?),
             // ZomeCallResponse::Ok(out) => Ok(RaftRpcResponse::try_from(out)?),
             _ => anyhow::bail!("call: unexpected response: {:?}", zcr),
         }

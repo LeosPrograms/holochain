@@ -257,6 +257,8 @@ impl RaftLogReader<TypeConfig> for Arc<MemLogStore> {
         {
             let log = self.log.read().await;
             for (_, serialized) in log.range(range.clone()) {
+                dbg!("serialized 2:", serialized);
+
                 let ent =
                     serde_json::from_str(serialized).map_err(|e| StorageError::read_logs(&e))?;
                 entries.push(ent);
@@ -354,6 +356,7 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
         let last = match last_serialized {
             None => None,
             Some(serialized) => {
+                dbg!("serialized 1:", serialized);
                 let ent: Entry<TypeConfig> =
                     serde_json::from_str(serialized).map_err(|e| StorageError::read_logs(&e))?;
                 Some(ent.log_id())

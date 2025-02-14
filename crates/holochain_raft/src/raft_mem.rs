@@ -45,12 +45,13 @@ pub async fn handle_incoming_request(
                         if let Some(leader) = maybe_leader.leader_id.as_ref() {
                             RaftRpcResponse::Proposal(ProposalResponse::ForwardToLeader(
                                 leader.agent(),
-                            ));
+                            ))
                         } else {
-                            RaftRpcResponse::Proposal(ProposalResponse::NoLeader);
+                            RaftRpcResponse::Proposal(ProposalResponse::NoLeader)
                         }
+                    } else {
+                        anyhow::bail!("handle_incoming_request: unexpected error: {e:?}");
                     }
-                    anyhow::bail!("no leader");
                 }
                 Ok(_) => RaftRpcResponse::Proposal(ProposalResponse::Accepted),
             }

@@ -216,7 +216,7 @@ mod tests {
             assert_eq!(response, RaftInterfaceResponsePayload::Ok);
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
         mk_request(0, RaftInterfaceRequestPayload::Propose(RaftOp(vec![0])))
             .await
