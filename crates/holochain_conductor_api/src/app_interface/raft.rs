@@ -29,8 +29,8 @@ pub enum RaftInterfaceRequestPayload {
     Leave,
     /// Propose an operation to the raft network
     Propose(holochain_raft::RaftOp),
-    /// Get log entries starting from the given log id
-    GetLogEntries(holochain_raft::LogId),
+    /// Get log entries after the given log id
+    GetLogEntries(Option<u64>),
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]

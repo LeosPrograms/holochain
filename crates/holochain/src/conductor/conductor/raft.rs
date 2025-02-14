@@ -117,12 +117,14 @@ impl Conductor {
                     Err(e) => Err(ConductorError::other(e.to_string())),
                 }
             }
-            RaftInterfaceRequestPayload::GetLogEntries(log_id) => {
+            RaftInterfaceRequestPayload::GetLogEntries(index) => {
                 let mut reader = storage.get_log_reader().await;
-                let entries = reader
-                    .try_get_log_entries(log_id.index..)
-                    .await
-                    .map_err(|e| ConductorError::other(e.to_string()))?;
+                let entries = if let Some(index) = index {
+                    reader.try_get_log_entries(index..).await
+                } else {
+                    reader.try_get_log_entries(..).await
+                }
+                .map_err(|e| ConductorError::other(e.to_string()))?;
                 Ok(RaftInterfaceResponsePayload::LogEntries(entries))
             }
         }
@@ -211,7 +213,7 @@ mod tests {
             .await;
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         mk_request(0, RaftInterfaceRequestPayload::Propose(RaftOp(vec![0])))
             .await
@@ -224,5 +226,11 @@ mod tests {
         mk_request(2, RaftInterfaceRequestPayload::Propose(RaftOp(vec![2])))
             .await
             .unwrap();
+
+        dbg!(
+            mk_request(3, RaftInterfaceRequestPayload::GetLogEntries(None))
+                .await
+                .unwrap()
+        );
     }
 }

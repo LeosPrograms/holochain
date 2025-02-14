@@ -79,7 +79,7 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
         InstallSnapshotResponse<TypeConfig>,
         RPCError<TypeConfig, RaftError<TypeConfig, InstallSnapshotError>>,
     > {
-        // println!("<RAFT> install_snapshot {rpc:?}");
+        println!("<RAFT> install_snapshot {rpc:?}");
         Ok(self
             .client
             .call(self.target.agent(), rpc.into())
