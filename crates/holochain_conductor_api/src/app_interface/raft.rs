@@ -1,3 +1,5 @@
+use holochain_raft::{ClientRequest, ClientResponse};
+
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -30,13 +32,24 @@ pub enum RaftInterfaceRequestPayload {
     /// Propose an operation to the raft network
     Propose(holochain_raft::RaftOp),
     /// Get log entries after the given log id
-    GetLogEntries(Option<u64>),
+    GetAllLogEntries(Option<u64>),
+    /// Get user-created log entries after the given log id
+    GetUserLogEntries(Option<u64>),
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
+    derive_more::Unwrap,
+)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RaftInterfaceResponsePayload {
-    LogEntries(Vec<holochain_raft::Entry>),
+    AllLogEntries(Vec<holochain_raft::Entry>),
+    UserLogEntries(Vec<ClientRequest>),
     Ok,
     NoLeader,
 }

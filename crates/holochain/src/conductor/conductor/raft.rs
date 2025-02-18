@@ -2,13 +2,23 @@ use holochain_conductor_api::{
     RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
 };
 use holochain_raft::{
-    HcClient, HcNetworkFactory, MemLogStore, Raft, RaftLogReader, RaftLogStorage, RaftRpcRequest,
-    RaftRpcResponse,
+    EntryPayload, HcClient, HcNetworkFactory, MemLogStore, Raft, RaftLogReader, RaftLogStorage,
+    RaftRpcRequest, RaftRpcResponse,
 };
 
 use super::*;
 
 impl Conductor {
+    pub(crate) async fn get_raft(&self, dna_hash: DnaHash, workspace_hash: EntryHash) -> Raft {
+        let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
+            self, &dna_hash,
+        )
+        .expect("TODO");
+
+        let (raft, _, _) = self.lookup_raft(dna_hash, provenance, workspace_hash).await;
+        raft
+    }
+
     pub(crate) async fn handle_raft_rpc_call(
         &self,
         dna_hash: DnaHash,
@@ -117,7 +127,7 @@ impl Conductor {
                     Err(e) => Err(ConductorError::other(e.to_string())),
                 }
             }
-            RaftInterfaceRequestPayload::GetLogEntries(index) => {
+            RaftInterfaceRequestPayload::GetAllLogEntries(index) => {
                 let mut reader = storage.get_log_reader().await;
                 let entries = if let Some(index) = index {
                     reader.try_get_log_entries(index..).await
@@ -125,7 +135,25 @@ impl Conductor {
                     reader.try_get_log_entries(..).await
                 }
                 .map_err(|e| ConductorError::other(e.to_string()))?;
-                Ok(RaftInterfaceResponsePayload::LogEntries(entries))
+                Ok(RaftInterfaceResponsePayload::AllLogEntries(entries))
+            }
+            RaftInterfaceRequestPayload::GetUserLogEntries(index) => {
+                let mut reader = storage.get_log_reader().await;
+
+                let entries = if let Some(index) = index {
+                    reader.try_get_log_entries(index..).await
+                } else {
+                    reader.try_get_log_entries(..).await
+                }
+                .map_err(|e| ConductorError::other(e.to_string()))?
+                .into_iter()
+                .filter_map(|l| match l.payload {
+                    EntryPayload::Normal(n) => Some(n),
+                    _ => None,
+                })
+                .collect();
+
+                Ok(RaftInterfaceResponsePayload::UserLogEntries(entries))
             }
         }
     }
@@ -174,11 +202,49 @@ pub enum HcRaftError<RE> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use holochain_raft::RaftOp;
     use holochain_wasm_test_utils::TestWasm;
 
     use super::*;
     use crate::sweettest::*;
+
+    /// Wait for the cluster to settle on an elected leader. Only returns when all running conductors agree.
+    async fn await_leader(
+        batch: &SweetConductorBatch,
+        cells: &[SweetCell],
+        workspace: &EntryHash,
+        not_this_one: Option<usize>,
+    ) -> usize {
+        let dna_hash = cells[0].dna_hash();
+        let start = std::time::Instant::now();
+        loop {
+            let mut leaders = BTreeSet::new();
+            for c in batch.iter() {
+                if c.is_running() {
+                    let raft = c.get_raft(dna_hash.clone(), workspace.clone()).await;
+                    let leader = raft.current_leader().await;
+                    leaders.insert(leader.map(|l| l.agent()));
+                }
+            }
+            if leaders.len() == 1 {
+                if let Some(agent) = leaders.pop_first().unwrap() {
+                    let (leader_index, _) = cells
+                        .iter()
+                        .find_position(|c| c.agent_pubkey() == &agent)
+                        .unwrap();
+
+                    // Skip the one we're not interested in
+                    if Some(leader_index) != not_this_one {
+                        println!("leader {leader_index} found in {:?}", start.elapsed());
+                        return leader_index;
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_raft() {
@@ -194,43 +260,70 @@ mod tests {
         let cells = apps.cells_flattened();
         conductors.exchange_peer_info().await;
 
-        let mk_request = |i: usize, payload: RaftInterfaceRequestPayload| {
-            conductors[i].handle_raft_interface_call(RaftInterfaceRequest {
-                dna_hash: dna_hash.clone(),
-                workspace: workspace.clone(),
-                payload,
-            })
+        let mk_payload = |payload| RaftInterfaceRequest {
+            dna_hash: dna_hash.clone(),
+            workspace: workspace.clone(),
+            payload,
         };
 
         for i in 0..num {
             // This may error if a raft message was already sent from another initialized node.
-            let _ = mk_request(
-                i,
-                RaftInterfaceRequestPayload::Initialize(
+            let _ = conductors[i]
+                .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Initialize(
                     cells.iter().map(|c| c.agent_pubkey().clone()).collect(),
-                ),
-            )
-            .await;
+                )))
+                .await;
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        let leader_index = await_leader(&conductors, &cells, &workspace, None).await;
+        dbg!(leader_index);
+        // tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        mk_request(0, RaftInterfaceRequestPayload::Propose(RaftOp(vec![0])))
-            .await
-            .unwrap();
-
-        mk_request(1, RaftInterfaceRequestPayload::Propose(RaftOp(vec![1])))
-            .await
-            .unwrap();
-
-        mk_request(2, RaftInterfaceRequestPayload::Propose(RaftOp(vec![2])))
-            .await
-            .unwrap();
-
-        dbg!(
-            mk_request(3, RaftInterfaceRequestPayload::GetLogEntries(None))
+        for i in 0..num {
+            conductors[i]
+                .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Propose(
+                    RaftOp(vec![i as u8]),
+                )))
                 .await
-                .unwrap()
-        );
+                .unwrap();
+        }
+
+        conductors[leader_index].shutdown().await;
+
+        // TODO: there will be errors about not being able to connect to the leader.
+        // Need to make a good UX for that.
+
+        // for i in 0..num {
+        //     if i == leader_index {
+        //         continue;
+        //     }
+
+        //     conductors[i]
+        //         .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Propose(
+        //             RaftOp(vec![i as u8]),
+        //         )))
+        //         .await
+        //         .unwrap();
+        // }
+
+        let leader2 = await_leader(&conductors, &cells, &workspace, Some(leader_index)).await;
+        dbg!(leader2);
+        assert_ne!(leader_index, leader2);
+
+        let mut nonleader = 0;
+        while nonleader == leader_index || nonleader == leader2 {
+            nonleader += 1;
+        }
+
+        dbg!(nonleader);
+
+        let ops = conductors[nonleader]
+            .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::GetUserLogEntries(
+                None,
+            )))
+            .await
+            .unwrap();
+
+        assert_eq!(ops.unwrap_user_log_entries().len(), num);
     }
 }

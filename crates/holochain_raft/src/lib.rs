@@ -12,7 +12,7 @@ pub use raft_mem::{handle_incoming_request, new_raft_mem};
 
 pub use openraft::error;
 pub use openraft::storage::RaftLogStorage;
-pub use openraft::RaftLogReader;
+pub use openraft::{EntryPayload, RaftLogReader};
 
 pub type LogId = openraft::LogId<memstore::TypeConfig>;
 pub type Entry = openraft::Entry<memstore::TypeConfig>;
