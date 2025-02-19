@@ -25,7 +25,7 @@ pub struct RaftInterfaceResponse {
 pub enum RaftInterfaceRequestPayload {
     /// Initialize the raft network with the provided peers
     Initialize(Vec<AgentPubKey>),
-    /// Add the provided peers to the raft network
+    /// Message these peers, telling them to add me to their raft cluster
     Join(Vec<AgentPubKey>),
     /// Leave the raft network
     Leave,
