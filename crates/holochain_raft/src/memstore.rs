@@ -82,9 +82,9 @@ impl openraft::NodeId for HcNode {}
 /// Choose a LeaderId implementation by feature flag.
 mod leader_id_mode {
     // #[cfg(not(feature = "single-term-leader"))]
-    // pub use openraft::impls::leader_id_adv::LeaderId;
+    pub use openraft::impls::leader_id_adv::LeaderId;
     // #[cfg(feature = "single-term-leader")]
-    pub use openraft::impls::leader_id_std::LeaderId;
+    // pub use openraft::impls::leader_id_std::LeaderId;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -296,7 +296,7 @@ impl RaftSnapshotBuilder<TypeConfig> for Arc<MemStateMachine> {
             let sm = self.sm.read().await;
             data = serde_json::to_vec(&*sm).map_err(|e| StorageError::read_state_machine(&e))?;
 
-            last_applied_log = sm.last_applied_log;
+            last_applied_log = sm.last_applied_log.clone();
             last_membership = sm.last_membership.clone();
 
             if let Some(d) = self.block.get_blocking(&BlockOperation::BuildSnapshot) {
@@ -313,7 +313,7 @@ impl RaftSnapshotBuilder<TypeConfig> for Arc<MemStateMachine> {
             *l
         };
 
-        let snapshot_id = if let Some(last) = last_applied_log {
+        let snapshot_id = if let Some(last) = &last_applied_log {
             format!(
                 "{}-{}-{}",
                 last.committed_leader_id(),
@@ -366,10 +366,10 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
             }
         };
 
-        let last_purged = *self.last_purged_log_id.read().await;
+        let last_purged = self.last_purged_log_id.read().await.clone();
 
-        let last = match last {
-            None => last_purged,
+        let last = match last.clone() {
+            None => last_purged.clone(),
             Some(x) => Some(x),
         };
 
@@ -415,7 +415,7 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
             return Ok(None);
         }
 
-        Ok(*self.committed.read().await)
+        Ok(self.committed.read().await.clone())
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -471,8 +471,8 @@ impl RaftLogStorage<TypeConfig> for Arc<MemLogStore> {
 
         {
             let mut ld = self.last_purged_log_id.write().await;
-            assert!(*ld <= Some(log_id));
-            *ld = Some(log_id);
+            assert!(ld.as_ref() <= Some(&log_id));
+            *ld = Some(log_id.clone());
         }
 
         {
@@ -499,7 +499,7 @@ impl RaftStateMachine<TypeConfig> for Arc<MemStateMachine> {
     ) -> Result<(Option<LogId<TypeConfig>>, StoredMembership<TypeConfig>), StorageError<TypeConfig>>
     {
         let sm = self.sm.read().await;
-        Ok((sm.last_applied_log, sm.last_membership.clone()))
+        Ok((sm.last_applied_log.clone(), sm.last_membership.clone()))
     }
 
     #[tracing::instrument(level = "trace", skip(self, entries))]
@@ -518,7 +518,7 @@ impl RaftStateMachine<TypeConfig> for Arc<MemStateMachine> {
         for entry in entries {
             tracing::debug!(%entry.log_id, "replicate to sm");
 
-            sm.last_applied_log = Some(entry.log_id);
+            sm.last_applied_log = Some(entry.log_id.clone());
 
             match entry.payload {
                 EntryPayload::Blank => res.push(ClientResponse(None)),
