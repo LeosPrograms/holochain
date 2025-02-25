@@ -5,6 +5,7 @@ use crate::memstore::{new_mem_store, HcNode, MemLogStore, TypeConfig};
 use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
 use crate::ClientRequest;
 
+use holo_hash::AgentPubKey;
 use maplit::{btreemap, btreeset};
 use openraft::{ChangeMembers, Config, Raft, RaftNetworkFactory};
 
@@ -32,6 +33,7 @@ pub async fn new_raft_mem(
 pub async fn handle_incoming_request(
     raft: &RaftMem,
     msg: RaftRpcRequestPayload,
+    remote_agent: AgentPubKey,
 ) -> anyhow::Result<RaftRpcResponse> {
     let response = match msg {
         RaftRpcRequestPayload::AppendEntries(req) => raft.append_entries(req).await?.into(),

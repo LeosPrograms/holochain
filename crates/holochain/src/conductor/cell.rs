@@ -893,7 +893,11 @@ impl Cell {
         {
             let res = self
                 .conductor_handle
-                .handle_raft_rpc_call(self.id().dna_hash().clone(), params.payload.decode()?)
+                .handle_raft_rpc_call(
+                    self.id().dna_hash().clone(),
+                    params.payload.decode()?,
+                    params.provenance,
+                )
                 .await
                 .map_err(|e| {
                     CellError::ConductorApiError(Box::new(ConductorApiError::other(e.to_string())))

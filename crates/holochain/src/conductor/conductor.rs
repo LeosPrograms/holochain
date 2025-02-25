@@ -38,7 +38,7 @@ pub const WASM_CACHE: &str = "wasm-cache";
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -54,6 +54,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -286,16 +287,18 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 
     #[cfg(feature = "raft")]
-    pub(crate) rafts: tokio::sync::Mutex<
-        HashMap<
-            (DnaHash, EntryHash),
-            (
-                holochain_raft::Raft,
-                Arc<holochain_raft::MemLogStore>,
-                holochain_raft::HcClient,
-            ),
-        >,
-    >,
+    pub(crate) rafts: Mutex<HashMap<(DnaHash, EntryHash), HcRaft>>,
+}
+
+/// State for a raft instance in the conductor
+#[derive(Clone)]
+pub struct HcRaft {
+    /// The raft instance
+    pub raft: holochain_raft::Raft,
+    /// The storage for the raft instance
+    pub storage: Arc<holochain_raft::MemLogStore>,
+    /// The client for making remote calls to other conductors' rafts
+    pub client: holochain_raft::HcClient,
 }
 
 impl Conductor {
@@ -362,7 +365,7 @@ mod startup_shutdown_impls {
                 app_broadcast: AppBroadcast::default(),
 
                 #[cfg(feature = "raft")]
-                rafts: tokio::sync::Mutex::new(HashMap::new()),
+                rafts: Mutex::new(HashMap::new()),
             }
         }
 

@@ -15,30 +15,41 @@ impl Conductor {
         )
         .expect("TODO");
 
-        let (raft, _, _) = self.lookup_raft(dna_hash, provenance, workspace_hash).await;
-        raft
+        let data = self.lookup_raft(dna_hash, provenance, workspace_hash).await;
+        data.raft
     }
 
     pub(crate) async fn handle_raft_rpc_call(
         &self,
         dna_hash: DnaHash,
         request: RaftRpcRequest,
+        remote_agent: AgentPubKey,
     ) -> ConductorResult<RaftRpcResponse> {
         // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
-        let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
+        let local_agent = crate::core::workflow::sys_validation_workflow::get_representative_agent(
             self, &dna_hash,
         )
         .expect("TODO");
 
-        let (raft, _, _) = self
-            .lookup_raft(dna_hash.clone(), provenance.clone(), request.workspace)
+        let data = self
+            .lookup_raft(dna_hash.clone(), local_agent.clone(), request.workspace)
             .await;
 
-        holochain_raft::handle_incoming_request(&raft, request.payload)
+        let res = holochain_raft::handle_incoming_request(
+            &data.raft,
+            request.payload,
+            remote_agent.clone(),
+        )
+        .await
+        .map_err(|e| ConductorError::other(format!("TODO handle_incoming_request error: {e:?}")))?;
+
+        data.client
+            .last_seen
+            .lock()
             .await
-            .map_err(|e| {
-                ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
-            })
+            .insert(remote_agent, Timestamp::now());
+
+        Ok(res)
     }
 
     pub(crate) async fn handle_raft_interface_call(
@@ -53,9 +64,14 @@ impl Conductor {
         )
         .expect("TODO");
 
-        let (_, mut storage, client) = self
+        let HcRaft {
+            mut storage,
+            client,
+            ..
+        } = self
             .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.workspace)
             .await;
+
         match raft_call.payload {
             RaftInterfaceRequestPayload::Initialize(peers) => {
                 let zome_call_params = client
@@ -161,30 +177,35 @@ impl Conductor {
     async fn lookup_raft(
         &self,
         dna_hash: DnaHash,
-        provenance: AgentPubKey,
+        local_agent: AgentPubKey,
         workspace: EntryHash,
-    ) -> (Raft, Arc<MemLogStore>, HcClient) {
+    ) -> HcRaft {
         let mut rafts = self.rafts.lock().await;
 
         match rafts.entry((dna_hash.clone(), workspace.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
                 let client = HcClient {
-                    provenance: provenance.clone(),
+                    provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),
                     workspace: workspace.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
+                    last_seen: Arc::new(Mutex::new(BTreeMap::new())),
                 };
                 let network = HcNetworkFactory {
                     client: client.clone(),
                 };
                 let (raft, storage) =
-                    holochain_raft::new_raft_mem(provenance.clone().into(), network)
+                    holochain_raft::new_raft_mem(local_agent.clone().into(), network)
                         .await
                         .map_err(|e| ConductorError::other(e.to_string()))
                         .expect("TODO");
-                let tup = (raft, storage, client);
-                v.insert(tup.clone());
-                tup
+                let hc_raft = HcRaft {
+                    raft,
+                    storage,
+                    client,
+                };
+                v.insert(hc_raft.clone());
+                hc_raft
             }
             std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
         }
