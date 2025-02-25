@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time::Instant};
 
 use crate::{
     handle_incoming_request,
@@ -11,7 +11,7 @@ use crate::{
     raft_mem::RaftMem,
 };
 
-pub type LastSeen = Arc<Mutex<BTreeMap<AgentPubKey, Timestamp>>>;
+pub type LastSeen = Arc<Mutex<BTreeMap<AgentPubKey, Instant>>>;
 
 #[derive(Clone)]
 pub struct HcClient {
@@ -65,7 +65,7 @@ impl HcClient {
             )
             .await?;
 
-        self.last_seen.lock().await.insert(target, Timestamp::now());
+        self.last_seen.lock().await.insert(target, Instant::now());
 
         let zcr = ZomeCallResponse::try_from(out)?;
         match zcr {
