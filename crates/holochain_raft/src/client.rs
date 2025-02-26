@@ -14,14 +14,13 @@ use crate::{
     handle_incoming_request,
     memstore::HcNode,
     message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse},
-    raft_mem::RaftMem,
     Raft, RaftForkId, RaftId,
 };
 
 pub struct Forker {
     last_seen: BTreeMap<AgentPubKey, Instant>,
     first_instant_without_quorum: Option<Instant>,
-    active_fork: Option<RaftForkId>,
+    pub active_fork: Option<RaftForkId>,
 }
 
 impl Forker {
@@ -36,7 +35,7 @@ impl Forker {
         self.last_seen.insert(agent, Instant::now());
     }
 
-    pub fn whos_here(&self, interval: Duration) -> BTreeSet<AgentPubKey> {
+    pub fn who_else_is_here(&self, interval: Duration) -> BTreeSet<AgentPubKey> {
         self.last_seen
             .iter()
             .filter(|(_, t)| t.elapsed() < interval)
@@ -51,7 +50,7 @@ impl Forker {
         }
 
         let here: BTreeSet<HcNode> = self
-            .whos_here(crate::PRESENCE_WINDOW)
+            .who_else_is_here(crate::PRESENCE_WINDOW)
             .into_iter()
             .map(HcNode::from)
             .collect();
@@ -59,7 +58,7 @@ impl Forker {
         let is_quorum = raft
             .with_raft_state(move |s| s.membership_state.effective().is_quorum(here.iter()))
             .await
-            .unwrap();
+            .unwrap_or(false);
 
         if is_quorum {
             self.first_instant_without_quorum = None;

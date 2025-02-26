@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use holochain_conductor_api::{
     RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
 };
@@ -5,6 +7,7 @@ use holochain_raft::{
     EntryPayload, HcClient, HcNetworkFactory, MemLogStore, Raft, RaftLogReader, RaftLogStorage,
     RaftRpcRequest, RaftRpcResponse,
 };
+use rand::Rng;
 
 use super::*;
 
@@ -30,8 +33,10 @@ impl Conductor {
         )
         .expect("TODO");
 
+        let raft_id = request.raft_id;
+
         let data = self
-            .lookup_raft(dna_hash.clone(), local_agent.clone(), request.raft_id)
+            .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_id.clone())
             .await;
 
         let res = holochain_raft::handle_incoming_request(
@@ -46,7 +51,19 @@ impl Conductor {
             let mut forker = data.client.forker.lock().await;
             forker.touch(remote_agent);
             if forker.its_forking_time(&data.raft).await {
-                // TODO: fork
+                dbg!("attempting fork");
+                let mut raft_id = raft_id.clone();
+                let fork_id = rand::thread_rng().gen();
+                raft_id.fork_id = Some(fork_id);
+                let mut members = forker.who_else_is_here(holochain_raft::PRESENCE_WINDOW);
+                members.insert(local_agent.clone());
+                let new = self.lookup_raft(dna_hash, local_agent, raft_id).await;
+                new.raft.initialize(members).await.map_err(|e| {
+                    dbg!("fork error", &e);
+                    ConductorError::other(format!("can't initialize forked raft: {e:?}"))
+                })?;
+                forker.active_fork = Some(fork_id);
+                dbg!("new fork", fork_id);
             }
         }
 
@@ -185,6 +202,7 @@ impl Conductor {
 
         match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
+                dbg!("new raft", &raft_id);
                 let client = HcClient {
                     provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),

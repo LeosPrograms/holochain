@@ -4,10 +4,15 @@ mod message;
 mod network;
 mod raft_mem;
 
+use std::collections::BTreeSet;
+
 pub use client::{Forker, HcClient};
-pub use memstore::{ClientRequest, ClientResponse, MemLogStore, RaftOp, RaftSnap, TypeConfig};
+pub use memstore::{
+    ClientRequest, ClientResponse, HcNode, MemLogStore, RaftOp, RaftSnap, TypeConfig,
+};
 pub use message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
 pub use network::HcNetworkFactory;
+use openraft::error::{InitializeError, RaftError};
 pub use raft_mem::{handle_incoming_request, new_raft_mem};
 
 pub use openraft::error;
@@ -16,7 +21,24 @@ pub use openraft::{EntryPayload, RaftLogReader};
 
 pub type LogId = openraft::LogId<memstore::TypeConfig>;
 pub type Entry = openraft::Entry<memstore::TypeConfig>;
-pub type Raft = openraft::Raft<memstore::TypeConfig>;
+
+#[derive(Clone, derive_more::Deref, derive_more::From)]
+pub struct Raft(openraft::Raft<memstore::TypeConfig>);
+
+impl Raft {
+    pub async fn initialize(
+        &self,
+        ids: impl IntoIterator<Item = holo_hash::AgentPubKey>,
+    ) -> Result<(), RaftError<TypeConfig, InitializeError<TypeConfig>>> {
+        let ids: BTreeSet<HcNode> = ids.into_iter().map(|a| a.into()).collect();
+        match self.0.initialize(ids).await {
+            Ok(_) => Ok(()),
+            // this error is ok, it means we got some network messages already
+            Err(RaftError::APIError(InitializeError::NotAllowed(_))) => Ok(()),
+            e => e,
+        }
+    }
+}
 
 pub type RaftForkId = u64;
 
@@ -25,8 +47,8 @@ pub const FORKING_WINDOW: std::time::Duration = std::time::Duration::from_secs(1
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RaftId {
-    workspace: holo_hash::EntryHash,
-    fork_id: Option<RaftForkId>,
+    pub workspace: holo_hash::EntryHash,
+    pub fork_id: Option<RaftForkId>,
 }
 
 impl From<holo_hash::EntryHash> for RaftId {

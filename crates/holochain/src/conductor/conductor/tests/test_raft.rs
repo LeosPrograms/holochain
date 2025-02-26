@@ -161,7 +161,7 @@ async fn await_leader(
                 let mut forker = data.client.forker.lock().await;
                 let forking_time = forker.its_forking_time(&data.raft).await;
                 let present: BTreeSet<String> = forker
-                    .whos_here(holochain_raft::PRESENCE_WINDOW)
+                    .who_else_is_here(holochain_raft::PRESENCE_WINDOW)
                     .into_iter()
                     .map(|a| a.suffix(4))
                     .collect();
