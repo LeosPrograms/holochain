@@ -48,6 +48,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
+use holochain_raft::RaftId;
 #[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
 use indexmap::IndexMap;
@@ -287,7 +288,7 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 
     #[cfg(feature = "raft")]
-    pub(crate) rafts: Mutex<HashMap<(DnaHash, EntryHash), HcRaft>>,
+    pub(crate) rafts: Mutex<HashMap<(DnaHash, RaftId), HcRaft>>,
 }
 
 /// State for a raft instance in the conductor

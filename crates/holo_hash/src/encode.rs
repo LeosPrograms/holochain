@@ -39,6 +39,14 @@ impl<T: HashType> std::fmt::Display for HoloHash<T> {
     }
 }
 
+impl<T: HashType> HoloHash<T> {
+    /// Return the last `len` characters of the hash as a string
+    pub fn suffix(&self, len: usize) -> String {
+        let s = self.to_string();
+        (&s[s.len() - len..]).to_string()
+    }
+}
+
 /// internal REPR for holo hash
 pub fn holo_hash_encode(data: &[u8]) -> String {
     format!("u{}", URL_SAFE_NO_PAD.encode(data),)

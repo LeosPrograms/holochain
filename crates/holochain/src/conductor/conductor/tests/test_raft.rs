@@ -11,7 +11,7 @@ use crate::sweettest::*;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_raft() {
     let num = 5;
-    let workspace = EntryHash::from_raw_32(vec![55; 32]);
+    let raft_id: RaftId = EntryHash::from_raw_32(vec![55; 32]).into();
     let config = SweetConductorConfig::standard();
     let mut conductors = SweetConductorBatch::from_config(num, config).await;
 
@@ -28,7 +28,7 @@ async fn test_raft() {
 
     let mk_payload = |payload| RaftInterfaceRequest {
         dna_hash: dna_hash.clone(),
-        workspace: workspace.clone(),
+        raft_id: raft_id.clone(),
         payload,
     };
 
@@ -41,7 +41,7 @@ async fn test_raft() {
         .unwrap();
 
     // wait for self-election
-    let leader_index = await_leader([&conductors[0]], [&cells[0]], &workspace, None).await;
+    let leader_index = await_leader([&conductors[0]], [&cells[0]], &raft_id, None).await;
     assert_eq!(leader_index, 0);
 
     for i in 1..num {
@@ -75,7 +75,7 @@ async fn test_raft() {
     }
 
     // Wait for all clusters to agree on a leader
-    let leader_index = await_leader(conductors.iter(), &cells, &workspace, None).await;
+    let leader_index = await_leader(conductors.iter(), &cells, &raft_id, None).await;
     dbg!(leader_index);
 
     // Let each node propose an op
@@ -91,6 +91,7 @@ async fn test_raft() {
     // Make over half of the conductors crash
     for i in 0..(num + 1) / 2 {
         conductors[i].shutdown().await;
+        println!("SHUTDOWN {i}");
     }
 
     // // Make the leader crash
@@ -113,7 +114,7 @@ async fn test_raft() {
     // }
 
     // Wait for the survivors to agree on a new leader
-    let leader2 = await_leader(conductors.iter(), &cells, &workspace, Some(leader_index)).await;
+    let leader2 = await_leader(conductors.iter(), &cells, &raft_id, Some(leader_index)).await;
     dbg!(leader2);
     assert_ne!(leader_index, leader2);
 
@@ -142,7 +143,7 @@ async fn test_raft() {
 async fn await_leader(
     batch: impl IntoIterator<Item = &SweetConductor>,
     cells: impl IntoIterator<Item = &SweetCell>,
-    workspace: &EntryHash,
+    raft_id: &RaftId,
     not_this_one: Option<usize>,
 ) -> usize {
     let batch = batch.into_iter().collect_vec();
@@ -153,13 +154,27 @@ async fn await_leader(
         let mut leaders = BTreeSet::new();
         for (cond, cell) in batch.iter().zip(cells.iter()) {
             if cond.is_running() {
-                let data = cond.get_raft(dna_hash.clone(), workspace.clone()).await;
+                let data = cond.get_raft(dna_hash.clone(), raft_id.clone()).await;
                 let leader = data.raft.current_leader().await;
                 leaders.insert(leader.map(|l| l.agent()));
 
-                for (a, t) in data.client.last_seen.lock().await.iter() {
-                    println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());
-                }
+                let mut forker = data.client.forker.lock().await;
+                let forking_time = forker.its_forking_time(&data.raft).await;
+                let present: BTreeSet<String> = forker
+                    .whos_here(holochain_raft::PRESENCE_WINDOW)
+                    .into_iter()
+                    .map(|a| a.suffix(4))
+                    .collect();
+                println!(
+                    "{}: {} {:?}",
+                    cell.agent_pubkey().suffix(4),
+                    forking_time,
+                    present
+                );
+
+                // for (a, t) in data.client.forker.lock().await.last_seen().iter() {
+                //     println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());
+                // }
             }
         }
         println!("-----------");

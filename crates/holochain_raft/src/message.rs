@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use holochain_types::prelude::*;
 use openraft::raft::*;
 
@@ -13,7 +11,7 @@ pub enum RaftRpc {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RaftRpcRequest {
-    pub workspace: EntryHash,
+    pub raft_id: crate::RaftId,
     pub payload: RaftRpcRequestPayload,
 }
 

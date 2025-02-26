@@ -9,13 +9,13 @@ use holochain_raft::{
 use super::*;
 
 impl Conductor {
-    pub(crate) async fn get_raft(&self, dna_hash: DnaHash, workspace_hash: EntryHash) -> HcRaft {
+    pub(crate) async fn get_raft(&self, dna_hash: DnaHash, raft_id: RaftId) -> HcRaft {
         let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
             self, &dna_hash,
         )
         .expect("TODO");
 
-        self.lookup_raft(dna_hash, provenance, workspace_hash).await
+        self.lookup_raft(dna_hash, provenance, raft_id).await
     }
 
     pub(crate) async fn handle_raft_rpc_call(
@@ -31,7 +31,7 @@ impl Conductor {
         .expect("TODO");
 
         let data = self
-            .lookup_raft(dna_hash.clone(), local_agent.clone(), request.workspace)
+            .lookup_raft(dna_hash.clone(), local_agent.clone(), request.raft_id)
             .await;
 
         let res = holochain_raft::handle_incoming_request(
@@ -42,11 +42,13 @@ impl Conductor {
         .await
         .map_err(|e| ConductorError::other(format!("TODO handle_incoming_request error: {e:?}")))?;
 
-        data.client
-            .last_seen
-            .lock()
-            .await
-            .insert(remote_agent, tokio::time::Instant::now());
+        {
+            let mut forker = data.client.forker.lock().await;
+            forker.touch(remote_agent);
+            if forker.its_forking_time(&data.raft).await {
+                // TODO: fork
+            }
+        }
 
         Ok(res)
     }
@@ -68,7 +70,7 @@ impl Conductor {
             client,
             ..
         } = self
-            .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.workspace)
+            .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.raft_id)
             .await;
 
         match raft_call.payload {
@@ -177,18 +179,18 @@ impl Conductor {
         &self,
         dna_hash: DnaHash,
         local_agent: AgentPubKey,
-        workspace: EntryHash,
+        raft_id: RaftId,
     ) -> HcRaft {
         let mut rafts = self.rafts.lock().await;
 
-        match rafts.entry((dna_hash.clone(), workspace.clone())) {
+        match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
                 let client = HcClient {
                     provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),
-                    workspace: workspace.clone(),
+                    raft_id: raft_id.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    last_seen: Arc::new(Mutex::new(BTreeMap::new())),
+                    forker: holochain_raft::Forker::new(),
                 };
                 let network = HcNetworkFactory {
                     client: client.clone(),

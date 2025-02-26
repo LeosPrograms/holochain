@@ -1,4 +1,4 @@
-use holochain_raft::{ClientRequest, ClientResponse};
+use holochain_raft::{ClientRequest, ClientResponse, RaftForkId, RaftId};
 
 use super::*;
 
@@ -7,7 +7,7 @@ pub struct RaftInterfaceRequest {
     /// Hash of the network which contains the peers to sync with, e.g. `syn`
     pub dna_hash: DnaHash,
     /// A new raft instance is created for each workspace
-    pub workspace: EntryHash,
+    pub raft_id: RaftId,
     /// The actual request
     pub payload: RaftInterfaceRequestPayload,
 }
@@ -15,7 +15,7 @@ pub struct RaftInterfaceRequest {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct RaftInterfaceResponse {
     /// The workspace the request was made for
-    pub workspace: EntryHash,
+    pub raft_id: RaftId,
     /// The actual response
     pub payload: RaftInterfaceResponsePayload,
 }
