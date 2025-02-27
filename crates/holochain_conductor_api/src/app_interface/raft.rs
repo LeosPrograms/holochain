@@ -1,4 +1,4 @@
-use holochain_raft::{ClientRequest, ClientResponse, RaftForkId, RaftId};
+use holochain_raft::{ClientRequest, RaftId};
 
 use super::*;
 

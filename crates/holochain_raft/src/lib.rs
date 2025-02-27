@@ -48,14 +48,14 @@ pub const FORKING_WINDOW: std::time::Duration = std::time::Duration::from_secs(1
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RaftId {
     pub workspace: holo_hash::EntryHash,
-    pub fork_id: Option<RaftForkId>,
+    // pub fork_id: Option<RaftForkId>,
 }
 
 impl From<holo_hash::EntryHash> for RaftId {
     fn from(workspace: holo_hash::EntryHash) -> Self {
         Self {
             workspace,
-            fork_id: None,
+            // fork_id: None,
         }
     }
 }

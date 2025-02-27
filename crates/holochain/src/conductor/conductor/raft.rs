@@ -50,21 +50,24 @@ impl Conductor {
         {
             let mut forker = data.client.forker.lock().await;
             forker.touch(remote_agent);
-            if forker.its_forking_time(&data.raft).await {
-                dbg!("attempting fork");
-                let mut raft_id = raft_id.clone();
-                let fork_id = rand::thread_rng().gen();
-                raft_id.fork_id = Some(fork_id);
-                let mut members = forker.who_else_is_here(holochain_raft::PRESENCE_WINDOW);
-                members.insert(local_agent.clone());
-                let new = self.lookup_raft(dna_hash, local_agent, raft_id).await;
-                new.raft.initialize(members).await.map_err(|e| {
-                    dbg!("fork error", &e);
-                    ConductorError::other(format!("can't initialize forked raft: {e:?}"))
-                })?;
-                forker.active_fork = Some(fork_id);
-                dbg!("new fork", fork_id);
-            }
+
+            // TODO: hook up the case where we have no quorum but still want a functioning raft
+            //
+            // if forker.its_forking_time(&data.raft).await {
+            //     dbg!("attempting fork");
+            //     let mut raft_id = raft_id.clone();
+            //     let fork_id = rand::thread_rng().gen();
+            //     raft_id.fork_id = Some(fork_id);
+            //     let mut members = forker.who_else_is_here(holochain_raft::PRESENCE_WINDOW);
+            //     members.insert(local_agent.clone());
+            //     let new = self.lookup_raft(dna_hash, local_agent, raft_id).await;
+            //     new.raft.initialize(members).await.map_err(|e| {
+            //         dbg!("fork error", &e);
+            //         ConductorError::other(format!("can't initialize forked raft: {e:?}"))
+            //     })?;
+            //     forker.active_fork = Some(fork_id);
+            //     dbg!("new fork", fork_id);
+            // }
         }
 
         Ok(res)
