@@ -48,7 +48,7 @@ impl Conductor {
         .map_err(|e| ConductorError::other(format!("TODO handle_incoming_request error: {e:?}")))?;
 
         {
-            let mut forker = data.client.forker.lock().await;
+            let mut forker = data.client.peer_tracker.lock().await;
             forker.touch(remote_agent);
 
             // TODO: hook up the case where we have no quorum but still want a functioning raft
@@ -211,7 +211,7 @@ impl Conductor {
                     keystore: self.keystore().clone(),
                     raft_id: raft_id.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    forker: holochain_raft::Forker::new(),
+                    peer_tracker: holochain_raft::PeerTracker::new(),
                 };
                 let network = HcNetworkFactory {
                     client: client.clone(),

@@ -1,18 +1,22 @@
 mod client;
+mod forker;
 mod memstore;
 mod message;
 mod network;
+mod peer_tracker;
 mod raft_mem;
 
 use std::collections::BTreeSet;
 
-pub use client::{Forker, HcClient};
+pub use client::HcClient;
+pub use forker::Forker;
 pub use memstore::{
     ClientRequest, ClientResponse, HcNode, MemLogStore, RaftOp, RaftSnap, TypeConfig,
 };
 pub use message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
 pub use network::HcNetworkFactory;
 use openraft::error::{InitializeError, RaftError};
+pub use peer_tracker::PeerTracker;
 pub use raft_mem::{handle_incoming_request, new_raft_mem};
 
 pub use openraft::error;

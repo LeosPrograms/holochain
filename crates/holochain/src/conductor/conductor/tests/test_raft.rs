@@ -158,7 +158,7 @@ async fn await_leader(
                 let leader = data.raft.current_leader().await;
                 leaders.insert(leader.map(|l| l.agent()));
 
-                let mut forker = data.client.forker.lock().await;
+                let mut forker = data.client.peer_tracker.lock().await;
                 let forking_time = forker.its_forking_time(&data.raft).await;
                 let present: BTreeSet<String> = forker
                     .who_else_is_here(holochain_raft::PRESENCE_WINDOW)
@@ -172,7 +172,7 @@ async fn await_leader(
                     present
                 );
 
-                // for (a, t) in data.client.forker.lock().await.last_seen().iter() {
+                // for (a, t) in data.client.peer_tracker.lock().await.last_seen().iter() {
                 //     println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());
                 // }
             }
