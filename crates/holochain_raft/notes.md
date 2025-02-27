@@ -1,10 +1,10 @@
-- [X] ~~*need a way to detect when quorum is lost*~~ [2025-02-26]
-- [X] ~~*parallel network, multiple leaders*~~ [2025-02-26]
-- [X] ~~*can there be a leader even if quorum is lost? (NO.)*~~ [2025-02-26]
-- [ ] can an arbitrary snapshot be loaded in at any time? log compaction?
+# MVP
 
-features:
-- ability to install an arbitrary snapshot
+assuming all of the below works, let's start with idea 2, with no merging:
+
+- when the leader notices someone has not responded in a while, the leader demotes them to learner
+- if someone finds themselves suddenly out of the cluster, they'll ask to rejoin, and the leader will allow it
+
 
 # idea 1: use sub-rafts to represent forks whenever quorum is lost
 
@@ -89,6 +89,7 @@ TODO: rework this with the understanding that the "smaller partition" is realist
 - the way to let the application decide, is for the leader's application to receive a signal that a merge is happening, so that...
 - the leader's application can do a read and find the "merging" state entry, combine the data, and append a "merged" entry with the final result
   - IF a raft state machine is able to be provided by the application, this happens for free, because the state machine can handle the merge itself
+    - see https://github.com/databendlabs/openraft/blob/e7237893046b2e99d673261464ce4a840f511a0c/openraft/src/storage/v2/raft_state_machine.rs for trait that needs to be (partially) implemented by the app
   - if a generic SM is used, then either one of these should be done (which one I'm not sure due to my ignorance of raft):
     - a "snapshot" entry should be appended which wipes out all other context and just uses that snapshot as the snapshot from this point forward
     - or, if possible, a snapshot can be installed directly without committing a new entry
