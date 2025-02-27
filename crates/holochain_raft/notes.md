@@ -25,6 +25,7 @@ Forking:
 - keep the parent raft running (but maybe tune down the election timeout to reduce traffic), so that the lost peers can be rediscovered.
 - as soon as a leader is elected on the child fork, the leader will install a snapshot from the parent raft.
 - after this snapshot is installed, the Forking state is removed, and the raft functions as normal.
+- NOTE: probably good for the new raft to start with an entry designating it as a fork of the old, including the log id which indicates the fork point
 
 Fork ID:
 - rafts are identified by EntryHash plus optional ChildId, a random u64.
@@ -49,6 +50,9 @@ Overlaps/edge cases:
 
 
 # idea 2: dynamically change the membership set to try to keep quorum for as long as possible
+
+TODO: is it even possible for two partitioned rafts to maintain quorum in this way? I think only if there were a partial partition? Even so, even in the worst case where the leader has unilateral decision making power in removing some member, as soon as the leader and the member see each other again, or as soon as a new leader is elected, the member can rejoin.
+TODO: rework this with the understanding that the "smaller partition" is realistically an "idea 1" forked raft
 
 - if any node has not been visible for N seconds, send a message to the leader asking to remove them from the member set due to absence.
 - the leader collects these requests, and once a majority has been received, that node is removed and will have to rejoin (or maybe they become a learner but lose voting ability?)
