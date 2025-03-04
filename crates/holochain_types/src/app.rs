@@ -57,7 +57,6 @@ pub struct RegisterDnaPayload {
     #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
-    #[serde(flatten)]
     pub source: DnaSource,
 }
 
@@ -80,7 +79,6 @@ pub struct UpdateCoordinatorsPayload {
     /// The hash of the dna to swap coordinators for.
     pub dna_hash: DnaHash,
     /// Where to find the coordinators.
-    #[serde(flatten)]
     pub source: CoordinatorSource,
 }
 
@@ -124,11 +122,6 @@ pub struct DeleteCloneCellPayload {
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
-    ///
-    /// Since this field uses `#[serde(flatten)]`, when using other serialized data formats
-    /// like JSON or YAML, this field will actually show up as one of the variants of
-    /// `AppBundleSource` (e.g. `bundle` or `path`), rather than as a `source` field.
-    #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
@@ -276,8 +269,9 @@ pub enum RoleSettingsYaml {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
-    /// The actual serialized bytes of a bundle
-    Bundle(AppBundle),
+    /// The raw bytes of an app bundle
+    #[serde(with = "serde_bytes")]
+    Bytes(Vec<u8>),
     /// A local file path
     Path(PathBuf),
     // /// A URL
@@ -288,7 +282,7 @@ impl AppBundleSource {
     /// Get the bundle from the source. Consumes the source.
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
-            Self::Bundle(bundle) => bundle,
+            Self::Bytes(bytes) => AppBundle::decode(&bytes)?,
             Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
             // Self::Url(url) => todo!("reqwest::get"),
         })

@@ -6,12 +6,23 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Break dependency from holochain_state to holochain_p2p
+
+- Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
+
+## 0.5.0-dev.21
+
+## 0.5.0-dev.20
+
+## 0.5.0-dev.19
+
+- Break dependency from holochain\_state to holochain\_p2p
+- remove `serde(flatten)` attributes from certain enum variants of enums used in admin payloads (\#4719), thereby fixing an oversight of \#4616.
 
 ## 0.5.0-dev.18
 
 - Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` \#4616
 - Replace `tiny-keccak` with `sha3` due to dependency on problematic `crunchy` crate
+- Use `rustls-tls` instead of `native-tls-vendored` in reqwest due to compatibility issue with Android platform
 - Prevent “TODO” comments from being rendered in cargo docs.
 
 ## 0.5.0-dev.17
