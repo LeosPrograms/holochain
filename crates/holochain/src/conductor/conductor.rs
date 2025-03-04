@@ -48,7 +48,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
-use holochain_raft::RaftId;
+use holochain_raft::{HcRaft, RaftId};
 #[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
 use indexmap::IndexMap;
@@ -69,6 +69,7 @@ use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
+use holochain_conductor_api::Signal;
 pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
@@ -289,17 +290,6 @@ pub struct Conductor {
 
     #[cfg(feature = "raft")]
     pub(crate) rafts: Mutex<HashMap<(DnaHash, RaftId), HcRaft>>,
-}
-
-/// State for a raft instance in the conductor
-#[derive(Clone)]
-pub struct HcRaft {
-    /// The raft instance
-    pub raft: holochain_raft::Raft,
-    /// The storage for the raft instance
-    pub storage: Arc<holochain_raft::MemLogStore>,
-    /// The client for making remote calls to other conductors' rafts
-    pub client: holochain_raft::HcClient,
 }
 
 impl Conductor {

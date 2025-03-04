@@ -44,6 +44,7 @@ use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+use holochain_conductor_api::Signal;
 #[cfg(feature = "unstable-countersigning")]
 use {
     crate::core::workflow::countersigning_workflow::countersigning_success,

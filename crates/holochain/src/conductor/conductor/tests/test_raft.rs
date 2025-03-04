@@ -22,7 +22,7 @@ async fn test_raft() {
     let cells = apps.cells_flattened();
 
     for (i, c) in cells.iter().enumerate() {
-        println!("cell {}: {}", i, c.agent_pubkey());
+        println!("cell {}: {}", i, c.agent_pubkey().suffix(4));
     }
     conductors.exchange_peer_info().await;
 
@@ -56,12 +56,14 @@ async fn test_raft() {
         //
         // This may error with NotAllowed if a raft message was already sent from another initialized node.
         // If so it's safe to ignore.
-        let _ = conductors[i]
+        conductors[i]
             .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Initialize(
                 peers.clone(),
             )))
-            .await;
+            .await
+            .unwrap();
 
+        dbg!();
         // Broadcast a request to all known peers to be added to their raft cluster.
         // In reality the message only needs to be sent to the leader, and in fact only the leader
         // can process the request. Broadcasting is just a quicker way to get the message out to the leader.
@@ -71,6 +73,7 @@ async fn test_raft() {
         let res = conductors[i]
             .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Join(peers)))
             .await;
+        dbg!();
         let _ = res;
     }
 
@@ -90,8 +93,8 @@ async fn test_raft() {
 
     // Make over half of the conductors crash
     for i in 0..(num + 1) / 2 {
-        conductors[i].shutdown().await;
         println!("SHUTDOWN {i}");
+        conductors[i].shutdown().await;
     }
 
     // // Make the leader crash
@@ -158,19 +161,13 @@ async fn await_leader(
                 let leader = data.raft.current_leader().await;
                 leaders.insert(leader.map(|l| l.agent()));
 
-                let mut forker = data.client.peer_tracker.lock().await;
-                let forking_time = forker.its_forking_time(&data.raft).await;
-                let present: BTreeSet<String> = forker
-                    .who_else_is_here(holochain_raft::PRESENCE_WINDOW)
+                let tracker = data.client.peer_tracker.lock().await;
+                let present: BTreeSet<String> = tracker
+                    .responsive_peers(holochain_raft::PRESENCE_WINDOW)
                     .into_iter()
-                    .map(|a| a.suffix(4))
+                    .map(|a| a.agent().suffix(4))
                     .collect();
-                println!(
-                    "{}: {} {:?}",
-                    cell.agent_pubkey().suffix(4),
-                    forking_time,
-                    present
-                );
+                println!("{}: {:?}", cell.agent_pubkey().suffix(4), present);
 
                 // for (a, t) in data.client.peer_tracker.lock().await.last_seen().iter() {
                 //     println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());

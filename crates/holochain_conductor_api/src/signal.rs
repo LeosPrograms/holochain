@@ -3,8 +3,8 @@
 //! - App-defined signals are produced via the `emit_signal` host function.
 //! - System-defined signals are produced in various places in the system
 
-use crate::impl_from;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::impl_from;
 use holochain_zome_types::prelude::*;
 
 /// A Signal is some information emitted from within Holochain out through
@@ -23,6 +23,10 @@ pub enum Signal {
     },
     /// System-defined signals
     System(SystemSignal),
+
+    #[cfg(feature = "raft")]
+    /// Raft-defined signals
+    Raft(RaftSignal),
 }
 
 impl Signal {
@@ -45,4 +49,19 @@ pub enum SystemSignal {
 
 impl_from! {
     SystemSignal => Signal, |s| { Self::System(s) },
+}
+
+#[cfg(feature = "raft")]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
+pub struct RaftSignal {
+    id: holochain_raft::RaftId,
+    event: RaftEvent,
+}
+
+#[cfg(feature = "raft")]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+pub enum RaftEvent {
+    EntryCommitted,
+    MembershipChange,
 }

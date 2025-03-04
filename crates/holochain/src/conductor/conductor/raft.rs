@@ -39,17 +39,19 @@ impl Conductor {
             .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_id.clone())
             .await;
 
-        let res = holochain_raft::handle_incoming_request(
-            &data.raft,
-            request.payload,
-            remote_agent.clone(),
-        )
-        .await
-        .map_err(|e| ConductorError::other(format!("TODO handle_incoming_request error: {e:?}")))?;
+        let res =
+            holochain_raft::handle_incoming_request(&data, request.payload, remote_agent.clone())
+                .await
+                .map_err(|e| {
+                    ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
+                })?;
 
-        {
-            let mut forker = data.client.peer_tracker.lock().await;
-            forker.touch(remote_agent);
+        // Only do tracking stuff if we're the leader
+        #[allow(deprecated)]
+        if data.raft.is_leader().await.is_ok() {
+            let mut tracker = data.client.peer_tracker.lock().await;
+            tracker.touch(remote_agent);
+            tracker.handle_absentees(&data.raft).await;
 
             // TODO: hook up the case where we have no quorum but still want a functioning raft
             //
@@ -205,7 +207,6 @@ impl Conductor {
 
         match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
-                dbg!("new raft", &raft_id);
                 let client = HcClient {
                     provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),

@@ -1,3 +1,4 @@
+use holochain_conductor_api::Signal;
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::*;
 use std::collections::hash_map::Entry;

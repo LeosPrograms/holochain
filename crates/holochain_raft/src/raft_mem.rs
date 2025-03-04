@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::memstore::{new_mem_store, HcNode, MemLogStore, TypeConfig};
 use crate::message::{ProposalResponse, RaftRpcRequest, RaftRpcRequestPayload, RaftRpcResponse};
-use crate::{ClientRequest, Raft};
+use crate::{ClientRequest, HcRaft, Raft};
 
 use holo_hash::AgentPubKey;
 use maplit::{btreemap, btreeset};
@@ -31,10 +31,11 @@ pub async fn new_raft_mem(
 
 /// TODO: handle errors
 pub async fn handle_incoming_request(
-    raft: &Raft,
+    HcRaft { raft, .. }: &HcRaft,
     msg: RaftRpcRequestPayload,
     remote_agent: AgentPubKey,
 ) -> anyhow::Result<RaftRpcResponse> {
+    // dbg!(&msg, raft.local_agent().suffix(4), &remote_agent.suffix(4));
     let response = match msg {
         RaftRpcRequestPayload::AppendEntries(req) => raft.append_entries(req).await?.into(),
         RaftRpcRequestPayload::InstallSnapshot(req) => raft.install_snapshot(req).await?.into(),

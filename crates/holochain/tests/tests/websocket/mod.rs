@@ -4,6 +4,7 @@ use ed25519_dalek::ed25519::signature::SignerMut;
 use ed25519_dalek::SigningKey;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
+use holochain::prelude::*;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetDnaFile;

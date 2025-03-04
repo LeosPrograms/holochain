@@ -20,7 +20,7 @@ use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
-use holochain_websocket::*;
+use holochain_websocket::*;use holochain_conductor_api::Signal;
 use kitsune_p2p_types::config::TransportConfig;
 use nanoid::nanoid;
 use rand::Rng;
