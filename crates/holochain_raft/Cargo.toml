@@ -23,11 +23,14 @@ serde_json = "*"
 tracing = "*"
 tokio = { version = "*", features = ["sync"] }
 
+anyerror = { version = "*", features = ["anyhow"] }
+p2p-raft = { path = "/home/michael/proj/p2p-raft/crates/p2p-raft" }
+# p2p-raft = { git = "https://github.com/maackle/p2p-raft.git" }
 openraft = { git = "https://github.com/maackle/openraft.git", features = [
   "type-alias",
 ] }
-openraft-macros = { git = "https://github.com/maackle/openraft.git" }
-openraft-memstore = { git = "https://github.com/maackle/openraft.git" }
+# openraft-macros = { git = "https://github.com/maackle/openraft.git" }
+# openraft-memstore = { git = "https://github.com/maackle/openraft.git" }
 
 
 [profile.release]

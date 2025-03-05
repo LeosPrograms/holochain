@@ -1,8 +1,14 @@
-use holochain_types::prelude::*;
-// use log_store::LogStore;
+use std::future::Future;
+
+use anyerror::AnyError;
 use openraft::{
-    error::{Fatal, InstallSnapshotError, RemoteError},
-    raft::{InstallSnapshotRequest, InstallSnapshotResponse},
+    alias::VoteOf,
+    error::{
+        Fatal, InstallSnapshotError, RemoteError, ReplicationClosed, StreamingError, Unreachable,
+    },
+    network::v2::RaftNetworkV2,
+    raft::{InstallSnapshotRequest, InstallSnapshotResponse, SnapshotResponse},
+    OptionalSend, Snapshot,
 };
 use openraft::{
     error::{RPCError, RaftError},
@@ -10,11 +16,9 @@ use openraft::{
     raft::{AppendEntriesRequest, AppendEntriesResponse, VoteRequest, VoteResponse},
     RaftNetwork, RaftNetworkFactory,
 };
+use p2p_raft::message::RaftRequest;
 
-use crate::{
-    client::HcClient,
-    memstore::{HcNode, TypeConfig},
-};
+use crate::{client::HcClient, HcNode, TypeConfig};
 
 #[derive(Clone)]
 pub struct HcNetworkFactory {
@@ -47,51 +51,48 @@ impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {
 )]
 pub struct RemoteErrorWrapper(anyhow::Error);
 
-impl RaftNetwork<TypeConfig> for HcNetwork {
+impl RaftNetworkV2<TypeConfig> for HcNetwork {
     /// Send an AppendEntries RPC to the target.
     async fn append_entries(
         &mut self,
         rpc: AppendEntriesRequest<TypeConfig>,
         _option: RPCOption,
-    ) -> Result<AppendEntriesResponse<TypeConfig>, RPCError<TypeConfig, RaftError<TypeConfig>>>
-    {
+    ) -> Result<AppendEntriesResponse<TypeConfig>, RPCError<TypeConfig>> {
         // println!("<RAFT> append_entries {rpc:?}");
-        Ok(self
+        match self
             .client
-            .call(self.target.agent(), rpc.into())
+            .call(self.target.agent(), RaftRequest::from(rpc).into())
             .await
-            .map_err(|e| {
-                tracing::error!("Error calling append entries: {:?}", e);
-                RPCError::RemoteError(RemoteError::new(
-                    self.target.clone(),
-                    RaftError::Fatal(Fatal::Panicked),
-                ))
-            })?
-            .unwrap_append_entries())
+        {
+            Ok(resp) => Ok(resp.unwrap_raft().unwrap_append()),
+            Err(e) => {
+                tracing::error!("{e:?}");
+                Err(RPCError::Unreachable(Unreachable::new(&AnyError::from(e))))
+            }
+        }
     }
 
-    /// Send an InstallSnapshot RPC to the target.
-    async fn install_snapshot(
+    async fn full_snapshot(
         &mut self,
-        rpc: InstallSnapshotRequest<TypeConfig>,
+        vote: VoteOf<TypeConfig>,
+        snapshot: Snapshot<TypeConfig>,
+        _cancel: impl Future<Output = ReplicationClosed> + OptionalSend + 'static,
         _option: RPCOption,
-    ) -> Result<
-        InstallSnapshotResponse<TypeConfig>,
-        RPCError<TypeConfig, RaftError<TypeConfig, InstallSnapshotError>>,
-    > {
-        println!("<RAFT> install_snapshot {rpc:?}");
-        Ok(self
-            .client
-            .call(self.target.agent(), rpc.into())
-            .await
-            .map_err(|e| {
-                tracing::error!("Error calling install snapshot: {:?}", e);
-                RPCError::RemoteError(RemoteError::new(
-                    self.target.clone(),
-                    RaftError::Fatal(Fatal::Panicked),
-                ))
-            })?
-            .unwrap_install_snapshot())
+    ) -> Result<SnapshotResponse<TypeConfig>, StreamingError<TypeConfig>> {
+        let rpc = RaftRequest::Snapshot {
+            vote,
+            snapshot_meta: snapshot.meta,
+            snapshot_data: *snapshot.snapshot,
+        };
+        match self.client.call(self.target.agent(), rpc.into()).await {
+            Ok(resp) => Ok(resp.unwrap_raft().unwrap_snapshot()),
+            Err(e) => {
+                tracing::error!("{e:?}");
+                Err(StreamingError::Unreachable(Unreachable::new(
+                    &AnyError::from(e),
+                )))
+            }
+        }
     }
 
     /// Send a RequestVote RPC to the target.
@@ -99,20 +100,18 @@ impl RaftNetwork<TypeConfig> for HcNetwork {
         &mut self,
         rpc: VoteRequest<TypeConfig>,
         _option: RPCOption,
-    ) -> Result<VoteResponse<TypeConfig>, RPCError<TypeConfig, RaftError<TypeConfig>>> {
+    ) -> Result<VoteResponse<TypeConfig>, RPCError<TypeConfig>> {
         // println!("<RAFT> vote {rpc:?}");
-        Ok(self
+        match self
             .client
-            .call(self.target.agent(), rpc.into())
+            .call(self.target.agent(), RaftRequest::from(rpc).into())
             .await
-            // .unwrap()
-            .map_err(|e| {
-                tracing::error!("Error calling vote: {:?}", e);
-                RPCError::RemoteError(RemoteError::new(
-                    self.target.clone(),
-                    RaftError::Fatal(Fatal::Panicked),
-                ))
-            })?
-            .unwrap_vote())
+        {
+            Ok(resp) => Ok(resp.unwrap_raft().unwrap_vote()),
+            Err(e) => {
+                tracing::error!("{e:?}");
+                Err(RPCError::Unreachable(Unreachable::new(&AnyError::from(e))))
+            }
+        }
     }
 }

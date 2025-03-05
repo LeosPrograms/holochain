@@ -1,13 +1,9 @@
 use std::collections::BTreeSet;
 
 use holochain_conductor_api::{
-    RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
+    LogOp, RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
 };
-use holochain_raft::{
-    EntryPayload, HcClient, HcNetworkFactory, MemLogStore, Raft, RaftLogReader, RaftLogStorage,
-    RaftRpcRequest, RaftRpcResponse,
-};
-use rand::Rng;
+use holochain_raft::{message::*, *};
 
 use super::*;
 
@@ -24,9 +20,9 @@ impl Conductor {
     pub(crate) async fn handle_raft_rpc_call(
         &self,
         dna_hash: DnaHash,
-        request: RaftRpcRequest,
+        request: RpcRequestEnvelope,
         remote_agent: AgentPubKey,
-    ) -> ConductorResult<RaftRpcResponse> {
+    ) -> ConductorResult<RpcResponse> {
         // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
         let local_agent = crate::core::workflow::sys_validation_workflow::get_representative_agent(
             self, &dna_hash,
@@ -39,38 +35,13 @@ impl Conductor {
             .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_id.clone())
             .await;
 
-        let res =
-            holochain_raft::handle_incoming_request(&data, request.payload, remote_agent.clone())
-                .await
-                .map_err(|e| {
-                    ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
-                })?;
-
-        // Only do tracking stuff if we're the leader
-        #[allow(deprecated)]
-        if data.raft.is_leader().await.is_ok() {
-            let mut tracker = data.client.peer_tracker.lock().await;
-            tracker.touch(remote_agent);
-            tracker.handle_absentees(&data.raft).await;
-
-            // TODO: hook up the case where we have no quorum but still want a functioning raft
-            //
-            // if forker.its_forking_time(&data.raft).await {
-            //     dbg!("attempting fork");
-            //     let mut raft_id = raft_id.clone();
-            //     let fork_id = rand::thread_rng().gen();
-            //     raft_id.fork_id = Some(fork_id);
-            //     let mut members = forker.who_else_is_here(holochain_raft::PRESENCE_WINDOW);
-            //     members.insert(local_agent.clone());
-            //     let new = self.lookup_raft(dna_hash, local_agent, raft_id).await;
-            //     new.raft.initialize(members).await.map_err(|e| {
-            //         dbg!("fork error", &e);
-            //         ConductorError::other(format!("can't initialize forked raft: {e:?}"))
-            //     })?;
-            //     forker.active_fork = Some(fork_id);
-            //     dbg!("new fork", fork_id);
-            // }
-        }
+        let res = data
+            .raft
+            .handle_request(remote_agent.clone().into(), request.payload)
+            .await
+            .map_err(|e| {
+                ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
+            })?;
 
         Ok(res)
     }
@@ -82,7 +53,7 @@ impl Conductor {
         let dna_hash = raft_call.dna_hash.clone();
 
         // TODO: the representative agent must change if this agent ever leaves the network (and there are other local agents)
-        let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
+        let local_agent = crate::core::workflow::sys_validation_workflow::get_representative_agent(
             self, &dna_hash,
         )
         .expect("TODO");
@@ -90,25 +61,16 @@ impl Conductor {
         let HcRaft {
             mut storage,
             client,
-            ..
+            raft,
         } = self
-            .lookup_raft(dna_hash.clone(), provenance.clone(), raft_call.raft_id)
+            .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_call.raft_id)
             .await;
 
         match raft_call.payload {
             RaftInterfaceRequestPayload::Initialize(peers) => {
-                let zome_call_params = client
-                    .zome_call_params(
-                        provenance.clone(),
-                        holochain_raft::RaftRpcRequestPayload::Initialize(peers),
-                    )
-                    .map_err(|e| {
-                        ConductorError::other(format!("couldn't format zome call params: {e:?}"))
-                    })?;
-
-                self.call_zome(zome_call_params)
+                raft.initialize(peers.into_iter().map(HcNode::from))
                     .await
-                    .map_err(|e| ConductorError::other(format!("can't initialize: {e:?}")))??;
+                    .map_err(|e| ConductorError::other(format!("can't initialize: {e:?}")))?;
 
                 Ok(RaftInterfaceResponsePayload::Ok)
             }
@@ -116,24 +78,18 @@ impl Conductor {
                 // Ask all known peers to join
                 future::join_all(peers.into_iter().map(move |peer| {
                     let client = client.clone();
-                    let provenance = provenance.clone();
+                    let msg = P2pRequest::Join;
                     async move {
                         let res = client
-                            .call(
-                                peer.clone(),
-                                holochain_raft::RaftRpcRequestPayload::Join(provenance.clone()),
-                            )
-                            .await;
+                            .call(peer.clone(), msg.into())
+                            .await
+                            .map_err(|e| ConductorError::other(format!("can't join raft: {e:?}")))?
+                            .unwrap_p_2_p();
                         match res {
-                            Ok(holochain_raft::RaftRpcResponse::Proposal(
-                                holochain_raft::ProposalResponse::Accepted,
-                            )) => Ok(()),
-                            Ok(holochain_raft::RaftRpcResponse::Proposal(e)) => Err(
-                                ConductorError::other(format!("Can't connect to leader: {e:?}",)),
-                            ),
-                            res => Err(ConductorError::other(format!(
-                                "Error from leader while joining: {res:?}",
-                            ))),
+                            P2pResponse::Ok => {
+                                ConductorResult::Ok(RaftInterfaceResponsePayload::Ok)
+                            }
+                            r => Ok(RaftInterfaceResponsePayload::Error(r)),
                         }
                     }
                 }))
@@ -143,27 +99,26 @@ impl Conductor {
                 Ok(RaftInterfaceResponsePayload::Ok)
             }
             RaftInterfaceRequestPayload::Leave => {
-                client
-                    .call_leader_with_retry(holochain_raft::RaftRpcRequestPayload::Leave(
-                        provenance.clone(),
-                    ))
+                let res = client
+                    .call_leader_with_retry(P2pRequest::Leave.into())
                     .await
-                    .map_err(|_| ConductorError::other("can't leave"))?;
-                Ok(RaftInterfaceResponsePayload::Ok)
+                    .map_err(|e| ConductorError::other(format!("can't leave raft: {e:?}")))?
+                    .unwrap_p_2_p();
+                match res {
+                    P2pResponse::Ok => Ok(RaftInterfaceResponsePayload::Ok),
+                    r => Ok(RaftInterfaceResponsePayload::Error(r)),
+                }
             }
             RaftInterfaceRequestPayload::Propose(op) => {
                 // XXX: first call is to self. No need to use the client for this.
-                match client
-                    .call_leader_with_retry(holochain_raft::RaftRpcRequestPayload::ProposeOp(op))
+                let res = client
+                    .call_leader_with_retry(P2pRequest::Propose(op).into())
                     .await
-                {
-                    Ok(holochain_raft::RaftRpcResponse::Proposal(_res)) => {
-                        Ok(RaftInterfaceResponsePayload::Ok)
-                    }
-                    Ok(res) => Err(ConductorError::other(format!(
-                        "Unexpected response from leader during proposal: {res:?}",
-                    ))),
-                    Err(e) => Err(ConductorError::other(e.to_string())),
+                    .map_err(|e| ConductorError::other(format!("can't propose op in raft: {e:?}")))?
+                    .unwrap_p_2_p();
+                match res {
+                    P2pResponse::Ok => Ok(RaftInterfaceResponsePayload::Ok),
+                    r => Ok(RaftInterfaceResponsePayload::Error(r)),
                 }
             }
             RaftInterfaceRequestPayload::GetAllLogEntries(index) => {
@@ -187,7 +142,10 @@ impl Conductor {
                 .map_err(|e| ConductorError::other(e.to_string()))?
                 .into_iter()
                 .filter_map(|l| match l.payload {
-                    EntryPayload::Normal(n) => Some(n),
+                    EntryPayload::Normal(n) => Some(LogOp {
+                        log_id: l.log_id,
+                        op: n,
+                    }),
                     _ => None,
                 })
                 .collect();
@@ -212,7 +170,6 @@ impl Conductor {
                     keystore: self.keystore().clone(),
                     raft_id: raft_id.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    peer_tracker: holochain_raft::PeerTracker::new(),
                 };
                 let network = HcNetworkFactory {
                     client: client.clone(),

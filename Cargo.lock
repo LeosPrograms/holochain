@@ -182,6 +182,7 @@ version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71add24cc141a1e8326f249b74c41cfd217aeb2a67c9c6cf9134d175469afd49"
 dependencies = [
+ "anyhow",
  "serde",
 ]
 
@@ -1163,6 +1164,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1732,7 +1742,7 @@ version = "0.99.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3da29a38df43d6f156149c9b43ded5e018ddff2a855cf2cfd62e8cd7d079c69f"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
  "rustc_version",
@@ -1754,6 +1764,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
 dependencies = [
+ "convert_case 0.6.0",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
@@ -3278,6 +3289,7 @@ dependencies = [
 name = "holochain_raft"
 version = "0.1.0"
 dependencies = [
+ "anyerror",
  "anyhow",
  "derive_more 0.99.19",
  "futures",
@@ -3289,8 +3301,7 @@ dependencies = [
  "maplit",
  "once_cell",
  "openraft",
- "openraft-macros",
- "openraft-memstore",
+ "p2p-raft",
  "rand 0.9.0",
  "rand_distr 0.5.1",
  "rmp-serde",
@@ -5041,6 +5052,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "memstore"
+version = "0.1.0"
+dependencies = [
+ "openraft",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5639,6 +5660,28 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
+name = "p2p-raft"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "derive_more 1.0.0",
+ "futures",
+ "itertools 0.8.2",
+ "maplit",
+ "memstore",
+ "nanoid",
+ "openraft",
+ "openraft-macros",
+ "openraft-memstore",
+ "parking_lot 0.11.2",
+ "rand 0.9.0",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "parking"

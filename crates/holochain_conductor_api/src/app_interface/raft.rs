@@ -1,4 +1,4 @@
-use holochain_raft::{ClientRequest, RaftId};
+use holochain_raft::{RaftId, RaftOp, TypeConfig};
 
 use super::*;
 
@@ -30,7 +30,7 @@ pub enum RaftInterfaceRequestPayload {
     /// Leave the raft network
     Leave,
     /// Propose an operation to the raft network
-    Propose(holochain_raft::RaftOp),
+    Propose(RaftOp),
     /// Get log entries after the given log id
     GetAllLogEntries(Option<u64>),
     /// Get user-created log entries after the given log id
@@ -48,8 +48,14 @@ pub enum RaftInterfaceRequestPayload {
 )]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RaftInterfaceResponsePayload {
-    AllLogEntries(Vec<holochain_raft::Entry>),
-    UserLogEntries(Vec<ClientRequest>),
+    AllLogEntries(Vec<holochain_raft::Entry<TypeConfig>>),
+    UserLogEntries(Vec<LogOp>),
     Ok,
-    NoLeader,
+    Error(holochain_raft::message::P2pResponse),
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct LogOp {
+    pub log_id: holochain_raft::LogId<TypeConfig>,
+    pub op: RaftOp,
 }

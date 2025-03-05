@@ -1,71 +1,24 @@
 use holochain_types::prelude::*;
-use openraft::raft::*;
 
-use crate::{memstore::TypeConfig, RaftOp};
+use crate::TypeConfig;
 
-#[derive(Debug, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum RaftRpc {
-    Request(RaftRpcRequest),
-    Response(RaftRpcResponse),
-}
+// #[derive(Clone, Debug, derive_more::From, serde::Serialize, serde::Deserialize)]
+// pub enum RaftRpc {
+//     Request(RaftRpcRequest),
+//     Response(RaftRpcResponse),
+// }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct RaftRpcRequest {
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RpcRequestEnvelope {
     pub raft_id: crate::RaftId,
-    pub payload: RaftRpcRequestPayload,
+    pub payload: RpcRequest,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    derive_more::Unwrap,
-    derive_more::From,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-)]
-pub enum RaftRpcRequestPayload {
-    // Messages sent *from* the leader
-    #[from]
-    AppendEntries(AppendEntriesRequest<TypeConfig>),
-    #[from]
-    InstallSnapshot(InstallSnapshotRequest<TypeConfig>),
-    #[from]
-    Vote(VoteRequest<TypeConfig>),
+pub type RpcRequest = p2p_raft::message::RpcRequest<TypeConfig>;
+pub type RpcResponse = p2p_raft::message::RpcResponse<TypeConfig>;
 
-    // Messages sent *to* the leader
-    //
-    /// Propose an operation to be added to the log
-    ProposeOp(RaftOp),
-    /// Initialize the raft network with the provided peers
-    Initialize(Vec<AgentPubKey>),
-    /// An agent wants to join the raft network
-    Join(AgentPubKey),
-    /// An agent wants to leave the raft network
-    Leave(AgentPubKey),
-}
+pub type P2pRequest = p2p_raft::message::P2pRequest<TypeConfig>;
+pub type P2pResponse = p2p_raft::message::P2pResponse<TypeConfig>;
 
-#[derive(
-    Debug,
-    derive_more::Unwrap,
-    derive_more::From,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-)]
-pub enum RaftRpcResponse {
-    // Messages sent *from* the leader
-    AppendEntries(AppendEntriesResponse<TypeConfig>),
-    InstallSnapshot(InstallSnapshotResponse<TypeConfig>),
-    Vote(VoteResponse<TypeConfig>),
-
-    // Messages sent *to* the leader
-    Proposal(ProposalResponse),
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum ProposalResponse {
-    Accepted,
-    NoLeader,
-    ForwardToLeader(AgentPubKey),
-}
+pub type RaftRequest = p2p_raft::message::RaftRequest<TypeConfig>;
+pub type RaftResponse = p2p_raft::message::RaftResponse<TypeConfig>;
