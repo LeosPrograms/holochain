@@ -4,9 +4,7 @@ use holochain_conductor_api::{RaftInterfaceRequest, RaftInterfaceRequestPayload}
 use holochain_raft::RaftOp;
 use holochain_wasm_test_utils::TestWasm;
 
-use super::raft::*;
 use super::*;
-use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_raft() {
@@ -84,9 +82,9 @@ async fn test_raft() {
     // Let each node propose an op
     for i in 0..num {
         conductors[i]
-            .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Propose(RaftOp(
-                vec![i as u8],
-            ))))
+            .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Propose(
+                RaftOp::from(vec![i as u8]),
+            )))
             .await
             .unwrap();
     }
@@ -161,9 +159,9 @@ async fn await_leader(
                 let leader = data.raft.current_leader().await;
                 leaders.insert(leader.map(|l| l.agent()));
 
-                let tracker = data.client.peer_tracker.lock().await;
+                let tracker = data.raft.tracker.lock().await;
                 let present: BTreeSet<String> = tracker
-                    .responsive_peers(holochain_raft::PRESENCE_WINDOW)
+                    .responsive_peers(tokio::time::Duration::from_secs(3))
                     .into_iter()
                     .map(|a| a.agent().suffix(4))
                     .collect();

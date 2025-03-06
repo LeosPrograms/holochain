@@ -1,6 +1,6 @@
 use holochain_types::prelude::*;
 
-use crate::TypeConfig;
+use crate::HcrTypes;
 
 // #[derive(Clone, Debug, derive_more::From, serde::Serialize, serde::Deserialize)]
 // pub enum RaftRpc {
@@ -14,11 +14,11 @@ pub struct RpcRequestEnvelope {
     pub payload: RpcRequest,
 }
 
-pub type RpcRequest = p2p_raft::message::RpcRequest<TypeConfig>;
-pub type RpcResponse = p2p_raft::message::RpcResponse<TypeConfig>;
+pub type RpcRequest = p2p_raft::message::RpcRequest<HcrTypes>;
+pub type RpcResponse = p2p_raft::message::RpcResponse<HcrTypes>;
 
-pub type P2pRequest = p2p_raft::message::P2pRequest<TypeConfig>;
-pub type P2pResponse = p2p_raft::message::P2pResponse<TypeConfig>;
+pub type P2pRequest = p2p_raft::message::P2pRequest<HcrTypes>;
+pub type P2pResponse = p2p_raft::message::P2pResponse<HcrTypes>;
 
-pub type RaftRequest = p2p_raft::message::RaftRequest<TypeConfig>;
-pub type RaftResponse = p2p_raft::message::RaftResponse<TypeConfig>;
+pub type RaftRequest = p2p_raft::message::RaftRequest<HcrTypes>;
+pub type RaftResponse = p2p_raft::message::RaftResponse<HcrTypes>;

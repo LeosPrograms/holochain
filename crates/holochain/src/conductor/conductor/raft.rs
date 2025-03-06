@@ -7,6 +7,16 @@ use holochain_raft::{message::*, *};
 
 use super::*;
 
+fn make_config() -> Config {
+    Config {
+        heartbeat_interval: 500,
+        election_timeout_min: 1500,
+        election_timeout_max: 3000,
+        // max_in_snapshot_log_to_keep: 0,
+        ..Default::default()
+    }
+}
+
 impl Conductor {
     pub(crate) async fn get_raft(&self, dna_hash: DnaHash, raft_id: RaftId) -> HcRaft {
         let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
@@ -58,11 +68,7 @@ impl Conductor {
         )
         .expect("TODO");
 
-        let HcRaft {
-            mut storage,
-            client,
-            raft,
-        } = self
+        let HcRaft { client, mut raft } = self
             .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_call.raft_id)
             .await;
 
@@ -122,7 +128,7 @@ impl Conductor {
                 }
             }
             RaftInterfaceRequestPayload::GetAllLogEntries(index) => {
-                let mut reader = storage.get_log_reader().await;
+                let mut reader = raft.store.get_log_reader().await;
                 let entries = if let Some(index) = index {
                     reader.try_get_log_entries(index..).await
                 } else {
@@ -132,7 +138,7 @@ impl Conductor {
                 Ok(RaftInterfaceResponsePayload::AllLogEntries(entries))
             }
             RaftInterfaceRequestPayload::GetUserLogEntries(index) => {
-                let mut reader = storage.get_log_reader().await;
+                let mut reader = raft.store.get_log_reader().await;
 
                 let entries = if let Some(index) = index {
                     reader.try_get_log_entries(index..).await
@@ -174,29 +180,15 @@ impl Conductor {
                 let network = HcNetworkFactory {
                     client: client.clone(),
                 };
-                let (raft, storage) =
-                    holochain_raft::new_raft_mem(local_agent.clone().into(), network)
-                        .await
-                        .map_err(|e| ConductorError::other(e.to_string()))
-                        .expect("TODO");
-                let hc_raft = HcRaft {
-                    raft,
-                    storage,
-                    client,
-                };
+                let config = make_config();
+                let raft =
+                    holochain_raft::Dinghy::new_mem(local_agent.clone().into(), config, network)
+                        .await;
+                let hc_raft = HcRaft { raft, client };
                 v.insert(hc_raft.clone());
                 hc_raft
             }
             std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum HcRaftError<RE> {
-    #[error("No current leader. Must wait for a new leader to be elected.")]
-    NoLeader,
-
-    #[error(transparent)]
-    RaftError(#[from] RE),
 }

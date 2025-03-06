@@ -2,22 +2,32 @@ mod client;
 pub mod message;
 mod network;
 
-use std::sync::Arc;
-
 pub use client::HcClient;
 pub use network::HcNetworkFactory;
 
 pub use openraft::error;
 pub use openraft::storage::RaftLogStorage;
-pub use openraft::{Entry, EntryPayload, LogId, RaftLogReader};
+pub use openraft::{Config, Entry, EntryPayload, LogId, RaftLogReader};
+
+pub use p2p_raft::Dinghy;
+
+openraft::declare_raft_types!(
+    #[derive(serde::Serialize, serde::Deserialize)]
+    pub HcrTypes:
+        D = RaftOp,
+        R = (),
+        NodeId = HcNode,
+        Node = (),
+        SnapshotData = p2p_raft::StateMachineData<HcrTypes>,
+);
+
+impl p2p_raft::TypeCfg for HcrTypes {}
 
 /// State for a raft instance in the conductor
 #[derive(Clone)]
 pub struct HcRaft {
     /// The raft instance
-    pub raft: p2p_raft::Dinghy<TypeConfig>,
-    /// The storage for the raft instance
-    pub storage: p2p_raft::LogStore<TypeConfig>,
+    pub raft: Dinghy<HcrTypes, HcNetworkFactory>,
     /// The client for making remote calls to other conductors' rafts
     pub client: HcClient,
 }
@@ -53,6 +63,8 @@ impl From<holo_hash::EntryHash> for RaftId {
 #[serde(transparent)]
 pub struct HcNode(holo_hash::AgentPubKeyB64);
 
+impl openraft::NodeId for HcNode {}
+
 impl From<holo_hash::AgentPubKey> for HcNode {
     fn from(agent: holo_hash::AgentPubKey) -> Self {
         HcNode(agent.into())
@@ -84,17 +96,3 @@ impl Default for HcNode {
     derive_more::Into,
 )]
 pub struct RaftOp(#[serde(with = "serde_bytes")] Vec<u8>);
-
-openraft::declare_raft_types!(
-    #[derive(serde::Serialize, serde::Deserialize)]
-    pub TypeConfig:
-        D = RaftOp,
-        R = (),
-        NodeId = HcNode,
-        Node = (),
-        SnapshotData = Box<Vec<u8>>,
-);
-
-impl p2p_raft::TypeConf for TypeConfig {}
-
-impl openraft::NodeId for HcNode {}

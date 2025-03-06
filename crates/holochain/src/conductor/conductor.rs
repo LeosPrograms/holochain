@@ -38,7 +38,7 @@ pub const WASM_CACHE: &str = "wasm-cache";
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

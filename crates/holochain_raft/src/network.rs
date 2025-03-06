@@ -3,36 +3,33 @@ use std::future::Future;
 use anyerror::AnyError;
 use openraft::{
     alias::VoteOf,
-    error::{
-        Fatal, InstallSnapshotError, RemoteError, ReplicationClosed, StreamingError, Unreachable,
-    },
+    error::{ReplicationClosed, StreamingError, Unreachable},
     network::v2::RaftNetworkV2,
-    raft::{InstallSnapshotRequest, InstallSnapshotResponse, SnapshotResponse},
+    raft::SnapshotResponse,
     OptionalSend, Snapshot,
 };
 use openraft::{
-    error::{RPCError, RaftError},
+    error::RPCError,
     network::RPCOption,
     raft::{AppendEntriesRequest, AppendEntriesResponse, VoteRequest, VoteResponse},
-    RaftNetwork, RaftNetworkFactory,
+    RaftNetworkFactory,
 };
 use p2p_raft::message::RaftRequest;
 
-use crate::{client::HcClient, HcNode, TypeConfig};
+use crate::{client::HcClient, HcNode, HcrTypes};
 
 #[derive(Clone)]
 pub struct HcNetworkFactory {
     pub client: HcClient,
 }
 
-impl HcNetworkFactory {}
-
+#[derive(Clone)]
 pub struct HcNetwork {
     target: HcNode,
     client: HcClient,
 }
 
-impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {
+impl RaftNetworkFactory<HcrTypes> for HcNetworkFactory {
     type Network = HcNetwork;
 
     async fn new_client(&mut self, target: HcNode, _: &()) -> Self::Network {
@@ -43,21 +40,30 @@ impl RaftNetworkFactory<TypeConfig> for HcNetworkFactory {
     }
 }
 
-#[derive(
-    holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::thiserror::Error,
-    Debug,
-    derive_more::Display,
-    derive_more::From,
-)]
-pub struct RemoteErrorWrapper(anyhow::Error);
+impl p2p_raft::network::P2pNetwork<HcrTypes> for HcNetworkFactory {
+    async fn send_p2p(
+        &self,
+        _source: HcNode,
+        target: HcNode,
+        req: p2p_raft::message::P2pRequest<HcrTypes>,
+    ) -> Result<p2p_raft::message::P2pResponse<HcrTypes>, RPCError<HcrTypes>> {
+        match self.client.call(target.agent(), req.into()).await {
+            Ok(resp) => Ok(resp.unwrap_p_2_p()),
+            Err(e) => {
+                tracing::error!("{e:?}");
+                Err(RPCError::Unreachable(Unreachable::new(&AnyError::from(e))))
+            }
+        }
+    }
+}
 
-impl RaftNetworkV2<TypeConfig> for HcNetwork {
+impl RaftNetworkV2<HcrTypes> for HcNetwork {
     /// Send an AppendEntries RPC to the target.
     async fn append_entries(
         &mut self,
-        rpc: AppendEntriesRequest<TypeConfig>,
+        rpc: AppendEntriesRequest<HcrTypes>,
         _option: RPCOption,
-    ) -> Result<AppendEntriesResponse<TypeConfig>, RPCError<TypeConfig>> {
+    ) -> Result<AppendEntriesResponse<HcrTypes>, RPCError<HcrTypes>> {
         // println!("<RAFT> append_entries {rpc:?}");
         match self
             .client
@@ -74,11 +80,11 @@ impl RaftNetworkV2<TypeConfig> for HcNetwork {
 
     async fn full_snapshot(
         &mut self,
-        vote: VoteOf<TypeConfig>,
-        snapshot: Snapshot<TypeConfig>,
+        vote: VoteOf<HcrTypes>,
+        snapshot: Snapshot<HcrTypes>,
         _cancel: impl Future<Output = ReplicationClosed> + OptionalSend + 'static,
         _option: RPCOption,
-    ) -> Result<SnapshotResponse<TypeConfig>, StreamingError<TypeConfig>> {
+    ) -> Result<SnapshotResponse<HcrTypes>, StreamingError<HcrTypes>> {
         let rpc = RaftRequest::Snapshot {
             vote,
             snapshot_meta: snapshot.meta,
@@ -98,9 +104,9 @@ impl RaftNetworkV2<TypeConfig> for HcNetwork {
     /// Send a RequestVote RPC to the target.
     async fn vote(
         &mut self,
-        rpc: VoteRequest<TypeConfig>,
+        rpc: VoteRequest<HcrTypes>,
         _option: RPCOption,
-    ) -> Result<VoteResponse<TypeConfig>, RPCError<TypeConfig>> {
+    ) -> Result<VoteResponse<HcrTypes>, RPCError<HcrTypes>> {
         // println!("<RAFT> vote {rpc:?}");
         match self
             .client

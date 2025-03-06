@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use crate::message::*;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
@@ -20,7 +18,7 @@ impl HcClient {
     pub async fn call_leader_with_retry(&self, message: RpcRequest) -> anyhow::Result<RpcResponse> {
         let retries = 3;
         let mut target = self.provenance.clone();
-        let mut interval = tokio::time::interval(Duration::from_secs(3));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         for _ in 0..retries {
             interval.tick().await;
