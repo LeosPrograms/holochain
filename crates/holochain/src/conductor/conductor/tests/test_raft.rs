@@ -61,7 +61,6 @@ async fn test_raft() {
             .await
             .unwrap();
 
-        dbg!();
         // Broadcast a request to all known peers to be added to their raft cluster.
         // In reality the message only needs to be sent to the leader, and in fact only the leader
         // can process the request. Broadcasting is just a quicker way to get the message out to the leader.
@@ -71,7 +70,6 @@ async fn test_raft() {
         let res = conductors[i]
             .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Join(peers)))
             .await;
-        dbg!();
         let _ = res;
     }
 
@@ -89,10 +87,16 @@ async fn test_raft() {
             .unwrap();
     }
 
-    // Make over half of the conductors crash
+    println!("wrote data");
+
+    // // Make less than half of the conductors crash
+    // for i in 0..(num - 1) / 2 {
+    println!("TODO: can't yet handle loss of quorum. Check the handling of absentees. Also, the leader doesn't change!");
+    // Make more than half of the conductors crash
     for i in 0..(num + 1) / 2 {
-        println!("SHUTDOWN {i}");
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         conductors[i].shutdown().await;
+        println!("SHUTDOWN {i}");
     }
 
     // // Make the leader crash
@@ -156,8 +160,8 @@ async fn await_leader(
         for (cond, cell) in batch.iter().zip(cells.iter()) {
             if cond.is_running() {
                 let data = cond.get_raft(dna_hash.clone(), raft_id.clone()).await;
-                let leader = data.raft.current_leader().await;
-                leaders.insert(leader.map(|l| l.agent()));
+                let leader = data.raft.current_leader().await.map(|l| l.agent());
+                leaders.insert(leader.clone());
 
                 let tracker = data.raft.tracker.lock().await;
                 let present: BTreeSet<String> = tracker
@@ -165,7 +169,12 @@ async fn await_leader(
                     .into_iter()
                     .map(|a| a.agent().suffix(4))
                     .collect();
-                println!("{}: {:?}", cell.agent_pubkey().suffix(4), present);
+                println!(
+                    "{} <{:?}>: {:?}",
+                    cell.agent_pubkey().suffix(4),
+                    leader.map(|l| l.suffix(4)),
+                    present
+                );
 
                 // for (a, t) in data.client.peer_tracker.lock().await.last_seen().iter() {
                 //     println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());

@@ -171,11 +171,13 @@ impl Conductor {
 
         match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
-                let client = HcClient {
+                let mut client = HcClient {
                     provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),
                     raft_id: raft_id.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
+                    raft: Box::new(None),
+                    // tracker: PeerTracker::new(),
                 };
                 let network = HcNetworkFactory {
                     client: client.clone(),
@@ -184,7 +186,8 @@ impl Conductor {
                 let raft =
                     holochain_raft::Dinghy::new_mem(local_agent.clone().into(), config, network)
                         .await;
-                let hc_raft = HcRaft { raft, client };
+                client.raft = Box::new(Some(raft.clone()));
+                let hc_raft = HcRaft { client, raft };
                 v.insert(hc_raft.clone());
                 hc_raft
             }

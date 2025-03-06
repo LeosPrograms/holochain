@@ -1,10 +1,15 @@
-use crate::message::*;
+use std::time::Duration;
+
+use crate::{message::*, HcNetworkFactory, HcNode, HcrTypes};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
 use openraft::error::{ClientWriteError, RaftError};
+use p2p_raft::Dinghy;
 
 use crate::RaftId;
+
+const RESPONSIVE_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct HcClient {
@@ -12,6 +17,8 @@ pub struct HcClient {
     pub network: HolochainP2pDna,
     pub raft_id: RaftId,
     pub keystore: MetaLairClient,
+    // XXX: boxed to prevent a circular reference
+    pub raft: Box<Option<Dinghy<HcrTypes, HcNetworkFactory>>>,
 }
 
 impl HcClient {
@@ -60,7 +67,16 @@ impl HcClient {
 
         let zcr = ZomeCallResponse::try_from(out)?;
         match zcr {
-            ZomeCallResponse::Ok(out) => Ok(out.decode()?),
+            ZomeCallResponse::Ok(out) => {
+                if let Some(raft) = self.raft.as_ref() {
+                    let mut t = raft.tracker.lock().await;
+                    t.touch(&HcNode(target.into()));
+                    t.handle_absentees(&raft, RESPONSIVE_INTERVAL).await;
+                } else {
+                    tracing::warn!("raft not yet set in client");
+                }
+                Ok(out.decode()?)
+            }
             // ZomeCallResponse::Ok(out) => Ok(RaftRpcResponse::try_from(out)?),
             _ => anyhow::bail!("call: unexpected response: {:?}", zcr),
         }

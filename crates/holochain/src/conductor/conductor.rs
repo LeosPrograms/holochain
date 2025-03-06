@@ -289,7 +289,7 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 
     #[cfg(feature = "raft")]
-    pub(crate) rafts: Mutex<HashMap<(DnaHash, RaftId), HcRaft>>,
+    pub(crate) rafts: Arc<Mutex<HashMap<(DnaHash, RaftId), HcRaft>>>,
 }
 
 impl Conductor {
@@ -356,7 +356,7 @@ mod startup_shutdown_impls {
                 app_broadcast: AppBroadcast::default(),
 
                 #[cfg(feature = "raft")]
-                rafts: Mutex::new(HashMap::new()),
+                rafts: Arc::new(Mutex::new(HashMap::new())),
             }
         }
 
@@ -389,7 +389,14 @@ mod startup_shutdown_impls {
             let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
+
+            let rafts = self.rafts.clone();
             tokio::task::spawn(async move {
+                for raft in rafts.lock().await.values_mut() {
+                    let r = raft.raft.shutdown().await;
+                    dbg!("shutdown raft", &r);
+                }
+
                 tracing::info!("Sending shutdown signal to all managed tasks.");
                 let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
                 r?
