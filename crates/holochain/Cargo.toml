@@ -53,6 +53,7 @@ holochain_secure_primitive = { version = "^0.5.0-dev.1", path = "../holochain_se
 holochain_conductor_services = { version = "^0.4.0-dev.21", path = "../holochain_conductor_services" }
 holochain_conductor_config = { version = "^0.5.0-dev.8", path = "../holochain_conductor_config" }
 holochain_raft = { version = "^0.1.0", path = "../holochain_raft", optional = true }
+p2p-raft = { path = "/home/michael/proj/p2p-raft/crates/p2p-raft" }
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
@@ -348,4 +349,4 @@ unstable-countersigning = [
   "holochain_conductor_api/unstable-countersigning",
 ]
 
-raft = ["holochain_raft", "holochain_conductor_api/raft"]
+raft = ["holochain_raft/testing", "holochain_conductor_api/raft"]

@@ -19,35 +19,30 @@ use p2p_raft::message::RaftRequest;
 use crate::{client::HcClient, HcNode, HcrTypes};
 
 #[derive(Clone)]
-pub struct HcNetworkFactory {
-    pub client: HcClient,
-}
-
-#[derive(Clone)]
 pub struct HcNetwork {
     target: HcNode,
     client: HcClient,
 }
 
-impl RaftNetworkFactory<HcrTypes> for HcNetworkFactory {
+impl RaftNetworkFactory<HcrTypes> for HcClient {
     type Network = HcNetwork;
 
     async fn new_client(&mut self, target: HcNode, _: &()) -> Self::Network {
         HcNetwork {
             target,
-            client: self.client.clone(),
+            client: self.clone(),
         }
     }
 }
 
-impl p2p_raft::network::P2pNetwork<HcrTypes> for HcNetworkFactory {
+impl p2p_raft::network::P2pNetwork<HcrTypes> for HcClient {
     async fn send_p2p(
         &self,
         _source: HcNode,
         target: HcNode,
         req: p2p_raft::message::P2pRequest<HcrTypes>,
     ) -> Result<p2p_raft::message::P2pResponse<HcrTypes>, RPCError<HcrTypes>> {
-        match self.client.call(target.agent(), req.into()).await {
+        match self.call(target.agent(), req.into()).await {
             Ok(resp) => Ok(resp.unwrap_p_2_p()),
             Err(e) => {
                 tracing::error!("{e:?}");

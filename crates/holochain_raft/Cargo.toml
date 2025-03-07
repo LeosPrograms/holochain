@@ -32,6 +32,8 @@ openraft = { git = "https://github.com/maackle/openraft.git", features = [
 # openraft-macros = { git = "https://github.com/maackle/openraft.git" }
 # openraft-memstore = { git = "https://github.com/maackle/openraft.git" }
 
+[features]
+testing = ["p2p-raft/testing"]
 
 [profile.release]
 lto = true

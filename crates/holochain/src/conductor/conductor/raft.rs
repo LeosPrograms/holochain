@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use holochain_conductor_api::{
     LogOp, RaftInterfaceRequest, RaftInterfaceRequestPayload, RaftInterfaceResponsePayload,
 };
@@ -7,13 +5,16 @@ use holochain_raft::{message::*, *};
 
 use super::*;
 
-fn make_config() -> Config {
-    Config {
-        heartbeat_interval: 500,
-        election_timeout_min: 1500,
-        election_timeout_max: 3000,
-        // max_in_snapshot_log_to_keep: 0,
-        ..Default::default()
+fn make_config() -> DinghyConfig {
+    DinghyConfig {
+        p2p_config: Default::default(),
+        raft_config: Config {
+            heartbeat_interval: 500,
+            election_timeout_min: 1500,
+            election_timeout_max: 3000,
+            // max_in_snapshot_log_to_keep: 0,
+            ..Default::default()
+        },
     }
 }
 
@@ -52,6 +53,18 @@ impl Conductor {
             .map_err(|e| {
                 ConductorError::other(format!("TODO handle_incoming_request error: {e:?}"))
             })?;
+
+        {
+            let mut t = data.raft.tracker.lock().await;
+            println!(
+                " <handle> TOUCH {} <- {}",
+                local_agent.suffix(4),
+                remote_agent.suffix(4),
+            );
+            t.touch(&holochain_raft::HcNode::from(remote_agent));
+            t.handle_absentees(&data.raft, data.raft.config.p2p_config.responsive_interval)
+                .await;
+        }
 
         Ok(res)
     }
@@ -171,22 +184,25 @@ impl Conductor {
 
         match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
-                let mut client = HcClient {
+                let client = HcClient {
                     provenance: local_agent.clone(),
                     keystore: self.keystore().clone(),
                     raft_id: raft_id.clone(),
                     network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    raft: Box::new(None),
+                    raft: Arc::new(Mutex::new(None)),
                     // tracker: PeerTracker::new(),
                 };
-                let network = HcNetworkFactory {
-                    client: client.clone(),
-                };
+
+                let raft_lock = client.raft.clone();
+
                 let config = make_config();
-                let raft =
-                    holochain_raft::Dinghy::new_mem(local_agent.clone().into(), config, network)
-                        .await;
-                client.raft = Box::new(Some(raft.clone()));
+                let raft = holochain_raft::Dinghy::new_mem(
+                    local_agent.clone().into(),
+                    config,
+                    client.clone(),
+                )
+                .await;
+                *raft_lock.lock().await = Some(raft.clone());
                 let hc_raft = HcRaft { client, raft };
                 v.insert(hc_raft.clone());
                 hc_raft

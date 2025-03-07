@@ -2903,6 +2903,7 @@ dependencies = [
  "once_cell",
  "one_err",
  "opentelemetry_api",
+ "p2p-raft",
  "parking_lot 0.12.3",
  "petgraph",
  "predicates 3.1.3",

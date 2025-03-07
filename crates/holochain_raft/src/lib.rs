@@ -3,13 +3,15 @@ pub mod message;
 mod network;
 
 pub use client::HcClient;
-pub use network::HcNetworkFactory;
+use holo_hash::AgentPubKey;
 
 pub use openraft::error;
 pub use openraft::storage::RaftLogStorage;
 pub use openraft::{Config, Entry, EntryPayload, LogId, RaftLogReader};
 
-pub use p2p_raft::Dinghy;
+pub use p2p_raft::DinghyConfig;
+
+pub type Dinghy = p2p_raft::Dinghy<HcrTypes, HcClient>;
 
 openraft::declare_raft_types!(
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -27,7 +29,7 @@ impl p2p_raft::TypeCfg for HcrTypes {}
 #[derive(Clone)]
 pub struct HcRaft {
     /// The raft instance
-    pub raft: Dinghy<HcrTypes, HcNetworkFactory>,
+    pub raft: Dinghy,
     /// The client for making remote calls to other conductors' rafts
     pub client: HcClient,
 }
@@ -58,10 +60,15 @@ impl From<holo_hash::EntryHash> for RaftId {
     serde::Serialize,
     serde::Deserialize,
     derive_more::Deref,
-    derive_more::Display,
 )]
 #[serde(transparent)]
 pub struct HcNode(holo_hash::AgentPubKeyB64);
+
+impl std::fmt::Display for HcNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", AgentPubKey::from(self.0.clone()).suffix(4))
+    }
+}
 
 impl openraft::NodeId for HcNode {}
 

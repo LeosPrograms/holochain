@@ -1,15 +1,14 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use crate::{message::*, HcNetworkFactory, HcNode, HcrTypes};
+use crate::{message::*, HcNode, HcrTypes};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_types::prelude::*;
 use openraft::error::{ClientWriteError, RaftError};
 use p2p_raft::Dinghy;
+use tokio::sync::Mutex;
 
 use crate::RaftId;
-
-const RESPONSIVE_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct HcClient {
@@ -17,8 +16,8 @@ pub struct HcClient {
     pub network: HolochainP2pDna,
     pub raft_id: RaftId,
     pub keystore: MetaLairClient,
-    // XXX: boxed to prevent a circular reference
-    pub raft: Box<Option<Dinghy<HcrTypes, HcNetworkFactory>>>,
+    // XXX: circular reference, raft must be passed in after this is passed to raft
+    pub raft: Arc<Mutex<Option<Dinghy<HcrTypes, HcClient>>>>,
 }
 
 impl HcClient {
@@ -49,6 +48,13 @@ impl HcClient {
         target: AgentPubKey,
         message: RpcRequest,
     ) -> anyhow::Result<RpcResponse> {
+        println!(
+            "<CALL> {} -> {} ({}): {message:?}",
+            self.provenance.suffix(4),
+            target.suffix(4),
+            self.raft.lock().await.is_some(),
+        );
+
         let zome_call_params = self.zome_call_params(target.clone(), message)?;
         let zome_call_payload = holochain_types::ZomeCallParamsSigned::try_from_params(
             &self.keystore,
@@ -68,10 +74,12 @@ impl HcClient {
         let zcr = ZomeCallResponse::try_from(out)?;
         match zcr {
             ZomeCallResponse::Ok(out) => {
-                if let Some(raft) = self.raft.as_ref() {
+                if let Some(raft) = self.raft.lock().await.as_ref() {
                     let mut t = raft.tracker.lock().await;
+
                     t.touch(&HcNode(target.into()));
-                    t.handle_absentees(&raft, RESPONSIVE_INTERVAL).await;
+                    t.handle_absentees(&raft, raft.config.p2p_config.responsive_interval)
+                        .await;
                 } else {
                     tracing::warn!("raft not yet set in client");
                 }

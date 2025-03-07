@@ -1,7 +1,7 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Duration};
 
 use holochain_conductor_api::{RaftInterfaceRequest, RaftInterfaceRequestPayload};
-use holochain_raft::RaftOp;
+use holochain_raft::{Dinghy, RaftOp};
 use holochain_wasm_test_utils::TestWasm;
 
 use super::*;
@@ -29,6 +29,16 @@ async fn test_raft() {
         raft_id: raft_id.clone(),
         payload,
     };
+
+    if true {
+        let rafts = futures::future::join_all(conductors.iter().map(|c| {
+            c.get_raft(dna_hash.clone(), raft_id.clone())
+                .map(|r| r.raft)
+        }))
+        .await;
+
+        spawn_info_task(rafts);
+    }
 
     // Initialize the first conductor with a raft with only itself
     conductors[0]
@@ -68,9 +78,14 @@ async fn test_raft() {
         // TODO: test the above.
         // TODO: Join and Initialize will pretty much always go together, so maybe they should be combined.
         let res = conductors[i]
-            .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Join(peers)))
+            .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Join(
+                peers.clone(),
+            )))
             .await;
-        let _ = res;
+        println!(
+            "JOIN {i}: {:?}  {res:?}",
+            peers.iter().map(|p| p.suffix(4)).collect_vec()
+        );
     }
 
     // Wait for all clusters to agree on a leader
@@ -91,7 +106,11 @@ async fn test_raft() {
 
     // // Make less than half of the conductors crash
     // for i in 0..(num - 1) / 2 {
-    println!("TODO: can't yet handle loss of quorum. Check the handling of absentees. Also, the leader doesn't change!");
+    println!(
+        "TODO: can't yet handle loss of quorum. 
+        Check the handling of absentees and whether Join actually works. 
+        Also, the leader doesn't change!"
+    );
     // Make more than half of the conductors crash
     for i in 0..(num + 1) / 2 {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -163,25 +182,25 @@ async fn await_leader(
                 let leader = data.raft.current_leader().await.map(|l| l.agent());
                 leaders.insert(leader.clone());
 
-                let tracker = data.raft.tracker.lock().await;
-                let present: BTreeSet<String> = tracker
-                    .responsive_peers(tokio::time::Duration::from_secs(3))
-                    .into_iter()
-                    .map(|a| a.agent().suffix(4))
-                    .collect();
-                println!(
-                    "{} <{:?}>: {:?}",
-                    cell.agent_pubkey().suffix(4),
-                    leader.map(|l| l.suffix(4)),
-                    present
-                );
+                // let tracker = data.raft.tracker.lock().await;
+                // let present: BTreeSet<String> = tracker
+                //     .responsive_peers(tokio::time::Duration::from_secs(3))
+                //     .into_iter()
+                //     .map(|a| a.agent().suffix(4))
+                //     .collect();
+                // println!(
+                //     "{} <{:?}>: {:?}",
+                //     cell.agent_pubkey().suffix(4),
+                //     leader.map(|l| l.suffix(4)),
+                //     present
+                // );
 
                 // for (a, t) in data.client.peer_tracker.lock().await.last_seen().iter() {
                 //     println!("{}->{}: {:?}", cell.agent_pubkey(), a, t.elapsed());
                 // }
             }
         }
-        println!("-----------");
+        // println!("-----------");
         if leaders.len() == 1 {
             if let Some(agent) = leaders.pop_first().unwrap() {
                 let (leader_index, _) = cells
@@ -198,4 +217,64 @@ async fn await_leader(
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
     }
+}
+
+fn spawn_info_task(rafts: impl IntoIterator<Item = Dinghy>) {
+    let rafts = rafts.into_iter().collect_vec();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(1000));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        println!("spawned info task");
+        loop {
+            println!();
+            println!("........................................................");
+            interval.tick().await;
+            for r in rafts.iter() {
+                let t = r.tracker.lock().await;
+                let peers = t.responsive_peers(r.config.p2p_config.responsive_interval);
+                let members = r
+                    .raft
+                    .with_raft_state(|s| {
+                        s.membership_state
+                            .committed()
+                            .voter_ids()
+                            .collect::<BTreeSet<_>>()
+                    })
+                    .await
+                    .ok();
+
+                // let log = r.read_log_data().await;
+                // let snapshot = r
+                //     .raft
+                //     .get_snapshot()
+                //     .await
+                //     .ok()
+                //     .and_then(|s| Some(s?.snapshot.data));
+
+                if let (Some(members)) = (members) {
+                    let lines = [
+                        format!("... "),
+                        format!("{}", r.id),
+                        format!("<{:?}>", r.current_leader().await.map(|l| l.to_string())),
+                        format!(
+                            "members {:?}",
+                            members.iter().map(ToString::to_string).collect_vec()
+                        ),
+                        format!(
+                            "sees {:?}",
+                            peers.iter().map(ToString::to_string).collect_vec()
+                        ),
+                        // format!("snapshot {:?}", snapshot),
+                        // format!("log {:?}", log),
+                    ];
+
+                    println!("{}", lines.into_iter().join(" "));
+                } else {
+                    println!("... {} <shutdown>", r.id);
+                }
+            }
+            println!("........................................................");
+            println!();
+        }
+    });
 }
