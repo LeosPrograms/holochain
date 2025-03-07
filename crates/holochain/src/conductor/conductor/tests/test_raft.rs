@@ -113,7 +113,7 @@ async fn test_raft() {
     );
     // Make more than half of the conductors crash
     for i in 0..(num + 1) / 2 {
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         conductors[i].shutdown().await;
         println!("SHUTDOWN {i}");
     }
@@ -143,8 +143,8 @@ async fn test_raft() {
     assert_ne!(leader_index, leader2);
 
     // Check that all ops are still retrievable by the remaining voters
-    for i in num / 2..num {
-        if i == leader_index {
+    for i in 0..num {
+        if i == leader_index || !conductors[i].is_running() {
             continue;
         }
 
@@ -270,7 +270,7 @@ fn spawn_info_task(rafts: impl IntoIterator<Item = Dinghy>) {
 
                     println!("{}", lines.into_iter().join(" "));
                 } else {
-                    println!("... {} <shutdown>", r.id);
+                    println!("...  {} <shutdown>", r.id);
                 }
             }
             println!("........................................................");
