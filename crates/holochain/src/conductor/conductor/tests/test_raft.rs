@@ -8,6 +8,7 @@ use p2p_raft::testing::await_partition_stability;
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
 async fn test_raft() {
     holochain_trace::test_run();
 
@@ -156,6 +157,32 @@ async fn test_raft() {
             num,
             "agent {i} can't get all the ops"
         );
+    }
+
+    // Make the crashed conductors come back
+    for i in 0..(num + 1) / 2 {
+        conductors[i].startup().await;
+    }
+
+    // re-fetch the newly created rafts
+    let rafts = futures::future::join_all(conductors.iter().map(|c| {
+        c.get_raft(dna_hash.clone(), raft_id.clone())
+            .map(|r| r.raft)
+    }))
+    .await;
+
+    await_partition_stability(&rafts).await;
+
+    // Check that all conductors are voters
+    for i in 0..num {
+        for j in 0..num {
+            if i != j {
+                assert!(
+                    rafts[i].is_voter(&rafts[j].id).await.unwrap(),
+                    "{i} sees {j} as voter"
+                );
+            }
+        }
     }
 }
 

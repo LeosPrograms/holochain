@@ -77,7 +77,9 @@ impl Conductor {
         )
         .expect("TODO");
 
-        let HcRaft { client, mut raft } = self
+        let HcRaft {
+            client, mut raft, ..
+        } = self
             .lookup_raft(dna_hash.clone(), local_agent.clone(), raft_call.raft_id)
             .await;
 
@@ -180,30 +182,43 @@ impl Conductor {
 
         match rafts.entry((dna_hash.clone(), raft_id.clone())) {
             std::collections::hash_map::Entry::Vacant(v) => {
-                let client = HcClient {
-                    provenance: local_agent.clone(),
-                    keystore: self.keystore().clone(),
-                    raft_id: raft_id.clone(),
-                    network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
-                    raft: Arc::new(Mutex::new(None)),
-                    // tracker: PeerTracker::new(),
-                };
-
-                let raft_lock = client.raft.clone();
-
-                let config = make_config();
-                let raft = holochain_raft::Dinghy::new_mem(
-                    local_agent.clone().into(),
-                    config,
-                    client.clone(),
-                )
-                .await;
-                *raft_lock.lock().await = Some(raft.clone());
-                let hc_raft = HcRaft { client, raft };
+                let hc_raft = self.create_raft(dna_hash, local_agent, raft_id).await;
                 v.insert(hc_raft.clone());
                 hc_raft
             }
             std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
+        }
+    }
+
+    async fn create_raft(
+        &self,
+        dna_hash: DnaHash,
+        local_agent: AgentPubKey,
+        raft_id: RaftId,
+    ) -> HcRaft {
+        let client = HcClient {
+            provenance: local_agent.clone(),
+            keystore: self.keystore().clone(),
+            raft_id: raft_id.clone(),
+            network: self.holochain_p2p().to_dna(dna_hash.clone(), None),
+            raft: Arc::new(Mutex::new(None)),
+            // tracker: PeerTracker::new(),
+        };
+
+        let raft_lock = client.raft.clone();
+
+        let config = make_config();
+        let raft =
+            holochain_raft::Dinghy::new_mem(local_agent.clone().into(), config, client.clone())
+                .await;
+        *raft_lock.lock().await = Some(raft.clone());
+
+        let chore_task = tokio::spawn(raft.clone().chore_loop());
+
+        HcRaft {
+            client,
+            raft,
+            chore_task: Arc::new(chore_task),
         }
     }
 }

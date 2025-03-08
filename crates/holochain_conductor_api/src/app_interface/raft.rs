@@ -54,7 +54,7 @@ pub enum RaftInterfaceResponsePayload {
     Error(holochain_raft::message::P2pResponse),
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct LogOp {
     pub log_id: holochain_raft::LogId<HcrTypes>,
     pub op: RaftOp,

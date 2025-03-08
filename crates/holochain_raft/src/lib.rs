@@ -2,6 +2,8 @@ mod client;
 pub mod message;
 mod network;
 
+use std::sync::Arc;
+
 pub use client::HcClient;
 use holo_hash::AgentPubKey;
 
@@ -10,6 +12,7 @@ pub use openraft::storage::RaftLogStorage;
 pub use openraft::{Config, Entry, EntryPayload, LogId, RaftLogReader};
 
 pub use p2p_raft::DinghyConfig;
+use tokio::task::JoinHandle;
 
 pub type Dinghy = p2p_raft::Dinghy<HcrTypes, HcClient>;
 
@@ -32,6 +35,17 @@ pub struct HcRaft {
     pub raft: Dinghy,
     /// The client for making remote calls to other conductors' rafts
     pub client: HcClient,
+
+    /// The task that runs the raft chore loop, including
+    /// auto-rejoin logic and signal emission.
+    pub chore_task: Arc<JoinHandle<()>>,
+}
+
+impl HcRaft {
+    pub async fn shutdown(&self) -> Result<(), tokio::task::JoinError> {
+        self.chore_task.abort();
+        self.raft.shutdown().await
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
