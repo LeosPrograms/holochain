@@ -393,8 +393,9 @@ mod startup_shutdown_impls {
             let rafts = self.rafts.clone();
             tokio::task::spawn(async move {
                 for raft in rafts.lock().await.values_mut() {
-                    let r = raft.raft.shutdown().await;
-                    dbg!("shutdown raft", &r);
+                    if let Err(err) = raft.raft.shutdown().await {
+                        tracing::error!("error shutting down raft: {err:?}");
+                    }
                 }
 
                 tracing::info!("Sending shutdown signal to all managed tasks.");

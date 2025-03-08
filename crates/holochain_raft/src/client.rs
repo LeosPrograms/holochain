@@ -68,12 +68,6 @@ impl HcClient {
         match zcr {
             ZomeCallResponse::Ok(out) => {
                 let res = out.decode()?;
-                println!(
-                    "<CALL> {} -> {} ({}): {res:?}",
-                    self.provenance.suffix(4),
-                    target.suffix(4),
-                    self.raft.lock().await.is_some(),
-                );
                 if let Some(raft) = self.raft.lock().await.as_ref() {
                     let mut t = raft.tracker.lock().await;
 

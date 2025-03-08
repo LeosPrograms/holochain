@@ -19,7 +19,8 @@ fn make_config() -> DinghyConfig {
 }
 
 impl Conductor {
-    pub(crate) async fn get_raft(&self, dna_hash: DnaHash, raft_id: RaftId) -> HcRaft {
+    /// Get a raft instance
+    pub async fn get_raft(&self, dna_hash: DnaHash, raft_id: RaftId) -> HcRaft {
         let provenance = crate::core::workflow::sys_validation_workflow::get_representative_agent(
             self, &dna_hash,
         )
@@ -56,11 +57,6 @@ impl Conductor {
 
         {
             let mut t = data.raft.tracker.lock().await;
-            println!(
-                " <handle> TOUCH {} <- {}",
-                local_agent.suffix(4),
-                remote_agent.suffix(4),
-            );
             t.touch(&holochain_raft::HcNode::from(remote_agent));
             t.handle_absentees(&data.raft, data.raft.config.p2p_config.responsive_interval)
                 .await;

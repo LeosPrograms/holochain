@@ -1,5 +1,3 @@
-use holochain_types::prelude::*;
-
 use crate::HcrTypes;
 
 // #[derive(Clone, Debug, derive_more::From, serde::Serialize, serde::Deserialize)]

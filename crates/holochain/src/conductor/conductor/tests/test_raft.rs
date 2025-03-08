@@ -3,11 +3,24 @@ use std::{collections::BTreeSet, time::Duration};
 use holochain_conductor_api::{RaftInterfaceRequest, RaftInterfaceRequestPayload};
 use holochain_raft::{Dinghy, RaftOp};
 use holochain_wasm_test_utils::TestWasm;
+use p2p_raft::testing::await_partition_stability;
 
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_raft() {
+    holochain_trace::test_run();
+
+    tokio::spawn(async move {
+        let mut t = 0;
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            t += 1;
+            println!("     t = {t}");
+        }
+    });
+
     let num = 5;
     let raft_id: RaftId = EntryHash::from_raw_32(vec![55; 32]).into();
     let config = SweetConductorConfig::standard();
@@ -24,21 +37,23 @@ async fn test_raft() {
     }
     conductors.exchange_peer_info().await;
 
+    println!("exchanged peer info");
+
     let mk_payload = |payload| RaftInterfaceRequest {
         dna_hash: dna_hash.clone(),
         raft_id: raft_id.clone(),
         payload,
     };
 
-    if true {
-        let rafts = futures::future::join_all(conductors.iter().map(|c| {
-            c.get_raft(dna_hash.clone(), raft_id.clone())
-                .map(|r| r.raft)
-        }))
-        .await;
+    let rafts = futures::future::join_all(conductors.iter().map(|c| {
+        c.get_raft(dna_hash.clone(), raft_id.clone())
+            .map(|r| r.raft)
+    }))
+    .await;
 
-        spawn_info_task(rafts);
-    }
+    dbg!();
+
+    // spawn_info_task(rafts.clone());
 
     // Initialize the first conductor with a raft with only itself
     conductors[0]
@@ -48,9 +63,13 @@ async fn test_raft() {
         .await
         .unwrap();
 
+    dbg!();
+
     // wait for self-election
     let leader_index = await_leader([&conductors[0]], [&cells[0]], &raft_id, None).await;
     assert_eq!(leader_index, 0);
+
+    dbg!();
 
     for i in 1..num {
         // All known peers up to this point
@@ -90,7 +109,8 @@ async fn test_raft() {
 
     // Wait for all clusters to agree on a leader
     let leader_index = await_leader(conductors.iter(), &cells, &raft_id, None).await;
-    dbg!(leader_index);
+
+    dbg!();
 
     // Let each node propose an op
     for i in 0..num {
@@ -100,42 +120,18 @@ async fn test_raft() {
             )))
             .await
             .unwrap();
+
+        dbg!();
     }
 
     println!("wrote data");
 
-    // // Make less than half of the conductors crash
-    // for i in 0..(num - 1) / 2 {
-    println!(
-        "TODO: can't yet handle loss of quorum. 
-        Check the handling of absentees and whether Join actually works. 
-        Also, the leader doesn't change!"
-    );
     // Make more than half of the conductors crash
     for i in 0..(num + 1) / 2 {
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         conductors[i].shutdown().await;
         println!("SHUTDOWN {i}");
+        await_partition_stability(&rafts[i + 1..]).await;
     }
-
-    // // Make the leader crash
-    // conductors[leader_index].shutdown().await;
-
-    // TODO: there will be errors about not being able to connect to the leader.
-    // Need to make a good UX for that.
-
-    // for i in 0..num {
-    //     if i == leader_index {
-    //         continue;
-    //     }
-
-    //     conductors[i]
-    //         .handle_raft_interface_call(mk_payload(RaftInterfaceRequestPayload::Propose(
-    //             RaftOp(vec![i as u8]),
-    //         )))
-    //         .await
-    //         .unwrap();
-    // }
 
     // Wait for the survivors to agree on a new leader
     let leader2 = await_leader(conductors.iter(), &cells, &raft_id, Some(leader_index)).await;
@@ -251,7 +247,7 @@ fn spawn_info_task(rafts: impl IntoIterator<Item = Dinghy>) {
                 //     .ok()
                 //     .and_then(|s| Some(s?.snapshot.data));
 
-                if let (Some(members)) = (members) {
+                if let Some(members) = members {
                     let lines = [
                         format!("... "),
                         format!("{}", r.id),
