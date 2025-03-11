@@ -60,8 +60,6 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-exclude = ["crates/release-automation", "crates/holochain_raft"]
-
 resolver = "2"
 
 [workspace.dependencies]
