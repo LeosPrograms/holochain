@@ -4,6 +4,7 @@
 //! - System-defined signals are produced in various places in the system
 
 
+#[cfg(feature = "raft")]
 use holochain_raft::RaftEvent;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::impl_from;
