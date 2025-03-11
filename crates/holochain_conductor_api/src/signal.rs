@@ -8,7 +8,7 @@ use holochain_raft::RaftEvent;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::impl_from;
 use holochain_zome_types::prelude::*;
-
+use holochain_raft::*;
 
 /// A Signal is some information emitted from within Holochain out through
 /// an Interface
